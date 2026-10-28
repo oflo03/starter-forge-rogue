@@ -145,6 +145,14 @@ export function initializeForgeRegistry(): void {
       starterAbilities.set(type as PokemonType, choice.id);
     }
   }
+  const rewardDescriptions: Record<string, string> = {
+    "muscle-focus": "물리 기술의 피해가 1.3배가 됩니다.",
+    "mind-focus": "특수 기술의 피해가 1.3배가 됩니다.",
+    "twin-shell":
+      "HP가 최대치의 절반 이상일 때 받는 공격 피해가 25% 감소합니다. 다단 공격은 각 타격 직전에 판정합니다.",
+    "balanced-gears":
+      "공격과 특공 중 낮은 능력치를 쓰는 타격의 피해가 1.5배가 됩니다. 두 능력치가 같으면 모든 공격 타격에 적용합니다.",
+  };
   for (const key of ["muscle-focus", "mind-focus", "twin-shell", "balanced-gears"]) {
     const source = library.abilities.find(ability => ability.id === key);
     if (!source || source.source === "원작 기반") {
@@ -153,16 +161,16 @@ export function initializeForgeRegistry(): void {
     const builder = new AbBuilder(AbilityId.BLAZE, 9);
     switch (key) {
       case "muscle-focus":
-        builder.attr(MoveDamageBoostAbAttr, 1.15, (_user, _target, move) => move.category === MoveCategory.PHYSICAL);
+        builder.attr(MoveDamageBoostAbAttr, 1.3, (_user, _target, move) => move.category === MoveCategory.PHYSICAL);
         break;
       case "mind-focus":
-        builder.attr(MoveDamageBoostAbAttr, 1.15, (_user, _target, move) => move.category === MoveCategory.SPECIAL);
+        builder.attr(MoveDamageBoostAbAttr, 1.3, (_user, _target, move) => move.category === MoveCategory.SPECIAL);
         break;
       case "twin-shell":
-        builder.attr(ReceivedMoveDamageMultiplierAbAttr, pokemon => pokemon.getHpRatio() >= 0.5, 0.9);
+        builder.attr(ReceivedMoveDamageMultiplierAbAttr, pokemon => pokemon.getHpRatio() >= 0.5, 0.75);
         break;
       case "balanced-gears":
-        builder.attr(MoveDamageBoostAbAttr, 1.2, (pokemon, _target, move) => {
+        builder.attr(MoveDamageBoostAbAttr, 1.5, (pokemon, _target, move) => {
           if (!pokemon || move.category === MoveCategory.STATUS) {
             return false;
           }
@@ -172,7 +180,7 @@ export function initializeForgeRegistry(): void {
         });
         break;
     }
-    registeredAbilities.set(key, addAbility(builder, source.name, source.description));
+    registeredAbilities.set(key, addAbility(builder, source.name, rewardDescriptions[key]));
   }
   // Explicit support list prevents catalog effects from being offered without engine implementations.
   const templates = new Set([

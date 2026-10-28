@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import type { PreAttackModifyDamageAbAttrParams, PreDefendModifyDamageAbAttrParams } from "#abilities/ab-attrs";
 import {
   customAbilityChoices,
   customMoveChoices,
@@ -14,7 +15,9 @@ import { AbilityId } from "#enums/ability-id";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
+import { Stat } from "#enums/stat";
 import type { PlayerPokemon } from "#field/pokemon";
+import { NumberHolder } from "#utils/common";
 import { describe, expect, it } from "vitest";
 import Catalog from "../../../forge/vendor/catalog.js";
 
@@ -103,6 +106,44 @@ describe("Forge original engine registry", () => {
     expect(choices.find(choice => choice.name === "힘자랑")?.enhancedCategory).toBe(MoveCategory.PHYSICAL);
     expect(choices.find(choice => choice.name === "밸런스기어")?.enhancedCategory).toBe(MoveCategory.SPECIAL);
     expect(choices.find(choice => choice.name === "겹겹코트")?.enhancedCategory).toBeUndefined();
+  });
+
+  it("applies reward-sized attack boosts and conditional 25-percent damage reduction", () => {
+    const abilities = [
+      ...customAbilityChoices([PokemonType.FIRE], [90, 120, 80, 60, 80, 100], "buffs"),
+      ...customAbilityChoices([PokemonType.FIRE], [90, 60, 80, 120, 80, 100], "buffs"),
+    ];
+    const pokemon = { getStat: (stat: Stat) => (stat === Stat.ATK ? 120 : 60), getHpRatio: () => 0.5 } as PlayerPokemon;
+    const attackDamage = (name: string, id: MoveId): number => {
+      const choice = abilities.find(ability => ability.name === name)!;
+      const attr = allAbilities[choice.id].getAttrs("MoveDamageBoostAbAttr")[0];
+      const damage = new NumberHolder(100);
+      const params = { pokemon, opponent: pokemon, move: allMoves[id], damage } as PreAttackModifyDamageAbAttrParams;
+      if (attr.canApply(params)) {
+        attr.apply(params);
+      }
+      return damage.value;
+    };
+    expect(attackDamage("힘자랑", MoveId.TACKLE)).toBe(130);
+    expect(attackDamage("힘자랑", MoveId.WATER_GUN)).toBe(100);
+    expect(attackDamage("브레인파워", MoveId.WATER_GUN)).toBe(130);
+    expect(attackDamage("밸런스기어", MoveId.WATER_GUN)).toBe(150);
+    expect(attackDamage("밸런스기어", MoveId.TACKLE)).toBe(100);
+    const coat = allAbilities[abilities.find(ability => ability.name === "겹겹코트")!.id].getAttrs(
+      "ReceivedMoveDamageMultiplierAbAttr",
+    )[0];
+    const damage = new NumberHolder(100);
+    const params = {
+      pokemon,
+      opponent: pokemon,
+      move: allMoves[MoveId.TACKLE],
+      damage,
+    } as PreDefendModifyDamageAbAttrParams;
+    expect(coat.canApply(params)).toBe(true);
+    coat.apply(params);
+    expect(damage.value).toBe(75);
+    pokemon.getHpRatio = () => 0.49;
+    expect(coat.canApply(params)).toBe(false);
   });
 
   it("keeps three distinct rewards after three custom moves were already learned", () => {

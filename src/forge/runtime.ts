@@ -209,59 +209,12 @@ async function chooseCards(title: string, options: ForgeDraftOption[], seed: str
     globalScene.disableMenu = previousMenuState;
   }
 }
-async function offerForgeLinkedMove(pokemon: PlayerPokemon, id: MoveId, seed: string): Promise<void> {
-  if (pokemon.getMoveset(true).some(move => move.moveId === id)) {
-    return;
-  }
-  const learn = await chooseCards(
-    pokemon.getNameToRender({ useIllusion: false }) + " · 연계 기술",
-    [
-      { name: allMoves[id].name, description: moveDescription(id), value: true, moveId: id },
-      { name: "배우지 않기", description: "", value: false },
-    ],
-    seed,
-  );
-  if (!learn) {
-    return;
-  }
-  let slot = pokemon.getMoveset(true).length;
-  if (slot >= 4) {
-    slot = await chooseList("교체할 기술", [
-      ...pokemon
-        .getMoveset(true)
-        .map((move, index) => ({ name: move.getName(), description: moveDescription(move.moveId), value: index })),
-      { name: "취소", value: -1 },
-    ]);
-    if (slot < 0) {
-      return;
-    }
-  }
-  await initMoveAnim(id);
-  pokemon.setMove(slot, id);
-}
 function moveDescription(id: MoveId): string {
   const move = allMoves[id];
   const category = move.category === MoveCategory.PHYSICAL ? "물리" : "특수";
   const accuracy = move.accuracy < 0 ? "필중" : `${move.accuracy}%`;
   const priority = move.priority ? ` · 우선도 ${move.priority > 0 ? "+" : ""}${move.priority}` : "";
   return `${typeName(move.type)} · ${category} · 위력 ${move.power} · 명중 ${accuracy} · PP ${move.pp}${priority}\n${move.effect}`;
-}
-function linkedMoves(pokemon: PlayerPokemon, stats: number[], seed: string, abilityId: number) {
-  const choice = customAbilityChoices(growthTypes(pokemon), stats, seed).find(o => o.id === abilityId);
-  if (choice?.enhancedCategory === undefined) {
-    return [];
-  }
-  const category =
-    choice.name === "밸런스기어"
-      ? pokemon.stats[1] <= pokemon.stats[3]
-        ? MoveCategory.PHYSICAL
-        : MoveCategory.SPECIAL
-      : choice.enhancedCategory;
-  const distribution =
-    category === MoveCategory.PHYSICAL ? [100, 150, 100, 50, 100, 100] : [100, 50, 100, 150, 100, 100];
-  return customMoveChoices(growthTypes(pokemon), distribution, seed + ":links")
-    .filter(m => m.category === category)
-    .slice(0, 2);
 }
 function enhancedCategory(pokemon: PlayerPokemon, stats: number[]): MoveCategory | undefined {
   const choice = customAbilityChoices(growthTypes(pokemon), stats, "category").find(
@@ -358,13 +311,7 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
           `${name} · 특성`,
           options.map(o => ({
             name: o.name,
-            description:
-              o.description
-              + (o.enhancedCategory === undefined
-                ? ""
-                : `\n연계 후보: ${linkedMoves(pokemon, stats, seed, o.id)
-                    .map(m => m.name)
-                    .join(" · ")}`),
+            description: o.description,
             value: o,
           })),
           seed,
@@ -373,16 +320,6 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
         if (pokemon.isFusion()) {
           pokemon.fusionCustomPokemonData ??= new CustomPokemonData();
           pokemon.fusionCustomPokemonData.ability = choice.id;
-        }
-        const category = enhancedCategory(pokemon, stats);
-        if (category !== undefined) {
-          const linked = linkedMoves(pokemon, stats, seed, choice.id);
-          if (linked.length !== 2) {
-            throw new Error("연계 기술2개를 만들 수 없습니다.");
-          }
-          for (const move of linked) {
-            await offerForgeLinkedMove(pokemon, move.id, seed);
-          }
         }
       } else if (level === 56) {
         const dominant = stats[1] >= stats[3] ? 1 : 3;
