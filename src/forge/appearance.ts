@@ -2,12 +2,12 @@
 import { globalScene } from "#app/global-scene";
 import { PokemonType } from "#enums/pokemon-type";
 
-export function forgeAppearance(types: readonly (PokemonType | null)[], icon = false): string {
+export function forgeAppearance(types: readonly (PokemonType | null)[], icon = false, stage: 1 | 2 | 3 = 1): string {
   const values = types.filter((type): type is PokemonType => type !== null && type >= 0 && type < 18).slice(0, 2);
   if (values.length === 0) {
     values.push(PokemonType.NORMAL);
   }
-  const key = `forge-partner-${values.join("-")}${icon ? "-icon" : ""}`;
+  const key = `forge-partner-${values.join("-")}-stage${stage}${icon ? "-icon" : ""}`;
   if (globalScene.textures.exists(key)) {
     return key;
   }
@@ -40,6 +40,26 @@ export function forgeAppearance(types: readonly (PokemonType | null)[], icon = f
     );
     context.restore();
   });
+  // Pixel digits stay readable at party-icon size without depending on canvas fonts.
+  const digits = [
+    [],
+    ["010", "110", "010", "010", "111"],
+    ["111", "001", "111", "100", "111"],
+    ["111", "001", "111", "001", "111"],
+  ];
+  const pixel = icon ? 1 : 3;
+  const x = icon ? 24 : 73;
+  const y = icon ? 2 : 7;
+  context.fillStyle = "#20202a";
+  context.fillRect(x - pixel, y - pixel, 5 * pixel, 7 * pixel);
+  context.fillStyle = "#ffffff";
+  digits[stage].forEach((row, dy) =>
+    Array.from(row).forEach((value, dx) => {
+      if (value === "1") {
+        context.fillRect(x + dx * pixel, y + dy * pixel, pixel, pixel);
+      }
+    }),
+  );
   texture.add("0001.png", 0, 0, 0, size, size);
   texture.refresh();
   if (!icon && !globalScene.anims.exists(key)) {

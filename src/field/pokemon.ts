@@ -778,8 +778,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    */
   async loadAssets(ignoreOverride = true, useIllusion = false): Promise<void> {
     if (this.customPokemonData.forge) {
-      forgeAppearance(this.customPokemonData.types);
-      forgeAppearance(this.customPokemonData.types, true);
+      forgeAppearance(this.customPokemonData.types, false, this.customPokemonData.forge.stage);
+      forgeAppearance(this.customPokemonData.types, true, this.customPokemonData.forge.stage);
       await loadMoveAnimations(this.getMoveset().map(m => m.getMove().id));
       this.playAnim();
       return;
@@ -998,7 +998,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
   getSpriteKey(ignoreOverride?: boolean): string {
     if (this.customPokemonData.forge) {
-      return forgeAppearance(this.customPokemonData.types);
+      return forgeAppearance(this.customPokemonData.types, false, this.customPokemonData.forge.stage);
     }
     return this.getSpeciesForm(ignoreOverride, false).getSpriteKey(
       this.getGender(ignoreOverride) === Gender.FEMALE,
@@ -1010,7 +1010,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
   getBattleSpriteKey(back?: boolean, ignoreOverride?: boolean): string {
     if (this.customPokemonData.forge) {
-      return forgeAppearance(this.customPokemonData.types);
+      return forgeAppearance(this.customPokemonData.types, false, this.customPokemonData.forge.stage);
     }
     return `pkmn__${this.getBattleSpriteId(back, ignoreOverride)}`;
   }
@@ -1051,7 +1051,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
   getIconAtlasKey(ignoreOverride = false, useIllusion = true): string {
     if (this.customPokemonData.forge) {
-      return forgeAppearance(this.customPokemonData.types, true);
+      return forgeAppearance(this.customPokemonData.types, true, this.customPokemonData.forge.stage);
     }
     const illusion = this.summonData.illusion;
     const { formIndex, variant } = useIllusion && illusion ? illusion : this;

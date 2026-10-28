@@ -248,6 +248,7 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
         data.stage = level === 16 ? 2 : 3;
         data.baseStats = evolutionStats(stats, data.stage);
         pokemon.calculateStats();
+        await pokemon.loadAssets();
         await pokemon.updateInfo();
       }
       const rewardBase = data.seed + ":reward:" + level;

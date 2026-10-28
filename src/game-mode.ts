@@ -496,9 +496,9 @@ export function getGameMode(gameMode: GameModes): GameMode {
         { isForge: true, hasTrainers: true, hasMysteryEncounters: false },
         {
           5: classicFixedBattles[ClassicFixedBossWaves.RIVAL_1],
-          25: classicFixedBattles[ClassicFixedBossWaves.RIVAL_3],
+          25: classicFixedBattles[ClassicFixedBossWaves.RIVAL_2],
           40: classicFixedBattles[ClassicFixedBossWaves.EVIL_BOSS_1],
-          55: classicFixedBattles[ClassicFixedBossWaves.RIVAL_4],
+          55: classicFixedBattles[ClassicFixedBossWaves.RIVAL_3],
           60: classicFixedBattles[ClassicFixedBossWaves.CHAMPION],
         },
       );

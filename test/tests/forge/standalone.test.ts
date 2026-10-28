@@ -2,6 +2,7 @@
 import * as forgeRuntime from "#app/forge/runtime";
 import { getGameMode } from "#app/game-mode";
 import { handleTutorial, Tutorial } from "#app/tutorial";
+import { ClassicFixedBossWaves } from "#enums/fixed-boss-waves";
 import { GameModes } from "#enums/game-modes";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
@@ -10,6 +11,7 @@ import { SelectStarterPhase } from "#phases/select-starter-phase";
 import { TitlePhase } from "#phases/title-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { initSceneWithoutEncounterPhase } from "#test/utils/game-manager-utils";
+import { classicFixedBattles } from "#trainers/fixed-battle-configs";
 import type { OptionSelectModeConfig } from "#types/ui-types";
 import Phaser from "phaser";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -39,6 +41,13 @@ describe("Forge standalone experience", () => {
     expect(title.gameMode).toBe(GameModes.FORGE);
     expect(end).toHaveBeenCalledOnce();
     expect(mode.mock.calls.map(call => call[0])).not.toContain(UiMode.STARTER_SELECT);
+  });
+
+  it("uses the original rival encounters for waves 25 and 55", () => {
+    const mode = getGameMode(GameModes.FORGE);
+    expect(mode.getFixedBattle(25)).toBe(classicFixedBattles[ClassicFixedBossWaves.RIVAL_2]);
+    expect(mode.getFixedBattle(55)).toBe(classicFixedBattles[ClassicFixedBossWaves.RIVAL_3]);
+    expect(mode.getFixedBattle(5)).toBe(classicFixedBattles[ClassicFixedBossWaves.RIVAL_1]);
   });
 
   it("grants the original starting money when the Forge save slot is confirmed", async () => {
