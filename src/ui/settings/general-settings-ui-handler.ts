@@ -46,7 +46,8 @@ export class GeneralSettingsUiHandler extends BaseSettingsUiHandler {
 
     const settingIndex = this.uiItems.findIndex(uiItem => uiItem.key === "moveTouchControls");
     if (settingIndex === -1) {
-      console.warn("Could not find `moveTouchControls` setting label!");
+      // Desktop settings omit this touch-only row, even if the viewport later becomes touch-enabled.
+      return;
     }
 
     this.updateOptionValueLabel(
