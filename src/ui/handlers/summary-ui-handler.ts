@@ -375,7 +375,9 @@ export class SummaryUiHandler extends UiHandler {
     this.candyIcon.setTint(argbFromRgba(rgbHexToRgba(colorScheme[0])));
     this.candyOverlay.setTint(argbFromRgba(rgbHexToRgba(colorScheme[1])));
 
-    this.numberText.setText(padInt(getDexNumber(this.pokemon.species.speciesId), 4));
+    this.numberText.setText(
+      this.pokemon.customPokemonData.forge ? "—" : padInt(getDexNumber(this.pokemon.species.speciesId), 4),
+    );
     this.numberText.setColor(getTextColor(this.pokemon.isShiny() ? TextStyle.SUMMARY_GOLD : TextStyle.SUMMARY));
     this.numberText.setShadowColor(
       getTextColor(this.pokemon.isShiny() ? TextStyle.SUMMARY_GOLD : TextStyle.SUMMARY, true),
@@ -448,6 +450,11 @@ export class SummaryUiHandler extends UiHandler {
     updateCandyCountTextStyle(this.candyCountText, candyCount);
 
     this.candyShadow.setCrop(0, 0, 16, candyCropY);
+    if (globalScene.gameMode.isForge) {
+      [this.candyIcon, this.candyOverlay, this.candyShadow, this.candyCountText, this.championRibbon].forEach(item =>
+        item.setVisible(false),
+      );
+    }
 
     if (this.friendshipShadow.visible) {
       this.friendshipShadow.on("pointerover", () =>

@@ -354,6 +354,9 @@ class RunEntryContainer extends Phaser.GameObjects.Container {
     const gameModeLabel = addTextObject(8, 19, "", TextStyle.WINDOW);
     let mode = "";
     switch (data.gameMode) {
+      case GameModes.FORGE:
+        mode = "Starter Forge";
+        break;
       case GameModes.DAILY:
         mode = i18next.t("gameMode:dailyRun");
         break;

@@ -9,7 +9,10 @@ import { t } from "i18next";
 
 export class GeneralSettingsUiHandler extends BaseSettingsUiHandler {
   constructor() {
-    super("general", generalSettingsUiItems);
+    super(
+      "general",
+      generalSettingsUiItems.filter(item => !["enableTutorials", "eggSkipPreference"].includes(item.key)),
+    );
 
     window.addEventListener("resize", () => {
       this.updateMoveTouchControlsSettingsLabel();

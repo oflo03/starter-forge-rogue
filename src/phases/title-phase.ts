@@ -1,6 +1,6 @@
 import { pokerogueApi } from "#api/api";
 import { loggedInUser } from "#app/account";
-import { GameMode, getGameMode } from "#app/game-mode";
+import { getGameMode } from "#app/game-mode";
 import { audioManager } from "#app/global-audio-manager";
 import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
@@ -15,11 +15,9 @@ import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
 import { ModifierPoolType } from "#enums/modifier-pool-type";
 import { UiMode } from "#enums/ui-mode";
-import { Unlockables } from "#enums/unlockables";
 import { getBiomeKey } from "#field/arena";
 import type { Modifier } from "#modifiers/modifier";
 import { getDailyRunStarterModifiers, regenerateModifierPoolThresholds } from "#modifiers/modifier-type";
-import { vouchers } from "#system/voucher";
 import type { OptionSelectItem, OptionSelectModeConfig } from "#types/ui-types";
 import { SaveSlotUiMode } from "#ui/save-slot-select-ui-handler";
 import { isLocalServerConnected } from "#utils/common";
@@ -64,7 +62,7 @@ export class TitlePhase extends Phase {
     }
     try {
       const sessionData = await globalScene.gameData.getSession(loggedInUser.lastSessionSlot);
-      if (!sessionData) {
+      if (!sessionData || sessionData.gameMode !== GameModes.FORGE) {
         return NO_SAVE_SLOT;
       }
 
@@ -82,7 +80,7 @@ export class TitlePhase extends Phase {
   }
 
   private async showOptions(lastSessionSlot: number): Promise<void> {
-    const { gameData, ui } = globalScene;
+    const { ui } = globalScene;
     const options: OptionSelectItem[] = [];
     // Add a "continue" menu if the session slot ID is >-1
     if (lastSessionSlot > NO_SAVE_SLOT) {
@@ -96,74 +94,12 @@ export class TitlePhase extends Phase {
     }
     options.push(
       {
-        label: i18next.t("menu:newGame"),
+        label: "모험 시작",
         handler: () => {
-          const setModeAndEnd = (gameMode: GameModes) => {
-            this.gameMode = gameMode;
-            ui.setMode(UiMode.MESSAGE);
-            ui.clearText();
-            this.end();
-          };
-          const newGameOptions: OptionSelectItem[] = [];
-          newGameOptions.push({
-            label: "Starter Forge · 60웨이브",
-            handler: () => {
-              setModeAndEnd(GameModes.FORGE);
-              return true;
-            },
-          });
-          newGameOptions.push({
-            label: GameMode.getModeName(GameModes.CLASSIC),
-            handler: () => {
-              setModeAndEnd(GameModes.CLASSIC);
-              return true;
-            },
-          });
-          newGameOptions.push({
-            label: i18next.t("menu:dailyRun"),
-            handler: () => {
-              this.initDailyRun();
-              return true;
-            },
-          });
-          if (gameData.isUnlocked(Unlockables.ENDLESS_MODE)) {
-            newGameOptions.push({
-              label: GameMode.getModeName(GameModes.CHALLENGE),
-              handler: () => {
-                setModeAndEnd(GameModes.CHALLENGE);
-                return true;
-              },
-            });
-            newGameOptions.push({
-              label: GameMode.getModeName(GameModes.ENDLESS),
-              handler: () => {
-                setModeAndEnd(GameModes.ENDLESS);
-                return true;
-              },
-            });
-            if (gameData.isUnlocked(Unlockables.SPLICED_ENDLESS_MODE)) {
-              newGameOptions.push({
-                label: GameMode.getModeName(GameModes.SPLICED_ENDLESS),
-                handler: () => {
-                  setModeAndEnd(GameModes.SPLICED_ENDLESS);
-                  return true;
-                },
-              });
-            }
-          }
-          // Cancel button = back to title
-          newGameOptions.push({
-            label: i18next.t("menu:cancel"),
-            handler: () => {
-              globalScene.phaseManager.toTitleScreen();
-              super.end();
-              return true;
-            },
-          });
-          ui.showText(i18next.t("menu:selectGameMode"), null, () => {
-            const config: OptionSelectModeConfig = { options: newGameOptions, yOffset: 48 };
-            ui.setOverlayMode(UiMode.OPTION_SELECT, config);
-          });
+          this.gameMode = GameModes.FORGE;
+          ui.setMode(UiMode.MESSAGE);
+          ui.clearText();
+          this.end();
           return true;
         },
       },
@@ -189,9 +125,9 @@ export class TitlePhase extends Phase {
         keepOpen: true,
       },
       {
-        label: i18next.t("menu:menu"),
+        label: "설정",
         handler: () => {
-          ui.setOverlayMode(UiMode.MENU);
+          ui.setOverlayMode(UiMode.SETTINGS_GENERAL);
           return true;
         },
         keepOpen: true,
@@ -208,6 +144,19 @@ export class TitlePhase extends Phase {
     globalScene.ui.resetModeChain();
     globalScene.sessionSlotId = slotId;
     try {
+      const saved = await globalScene.gameData.getSession(slotId);
+      if (saved && saved.gameMode !== GameModes.FORGE) {
+        globalScene.ui.showText(
+          "이 게임에서는 Starter Forge 모험만 이어할 수 있습니다.",
+          null,
+          () => {
+            this.showOptions(NO_SAVE_SLOT);
+          },
+          null,
+          true,
+        );
+        return;
+      }
       const success = await globalScene.gameData.loadSession(slotId);
       if (success) {
         this.loaded = true;
@@ -221,6 +170,7 @@ export class TitlePhase extends Phase {
     }
   }
 
+  // Retained for upstream engine tests; the standalone title never offers other modes.
   initDailyRun(): void {
     globalScene.ui.clearText();
     globalScene.ui.setMode(UiMode.SAVE_SLOT, SaveSlotUiMode.SAVE, (slotId: number) => {
@@ -400,13 +350,6 @@ export class TitlePhase extends Phase {
             globalScene.phaseManager.pushNew("CheckSwitchPhase", 1, globalScene.currentBattle.double);
           }
         }
-      }
-    }
-
-    // TODO: Move this to a migrate script instead of running it on save slot load
-    for (const achv of Object.keys(globalScene.gameData.achvUnlocks)) {
-      if (Object.hasOwn(vouchers, achv) && achv !== "CLASSIC_VICTORY") {
-        globalScene.validateVoucher(vouchers[achv]);
       }
     }
 

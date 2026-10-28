@@ -1,6 +1,7 @@
 import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
 import { activeOverrides } from "#app/overrides";
+import { bypassLogin } from "#constants/app-constants";
 import { UiMode } from "#enums/ui-mode";
 import { AwaitableUiHandler } from "#ui/awaitable-ui-handler";
 import type { UiHandler } from "#ui/ui-handler";
@@ -98,6 +99,9 @@ const tutorialHandlers = {
  * @returns a promise with result `true` if the tutorial was run and finished, `false` otherwise
  */
 export async function handleTutorial(tutorial: Tutorial): Promise<boolean> {
+  if (bypassLogin) {
+    return false;
+  }
   if (!activeOverrides.BYPASS_TUTORIAL_SKIP_OVERRIDE) {
     if (!settings.general.enableTutorials) {
       return false;

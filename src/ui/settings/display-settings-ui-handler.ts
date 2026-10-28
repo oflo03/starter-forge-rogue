@@ -10,7 +10,10 @@ import i18next from "i18next";
 
 export class SettingsDisplayUiHandler extends BaseSettingsUiHandler {
   constructor() {
-    super("display", displaySettingUiItems);
+    super(
+      "display",
+      displaySettingUiItems.filter(item => item.key !== "hideUsername"),
+    );
   }
 
   protected override handleSaveSetting<V = any>(uiItem: SettingsUiItem<DisplaySettingsKey>, newValue: V): void {

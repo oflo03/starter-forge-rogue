@@ -180,7 +180,9 @@ export class MenuUiHandler extends OptionSelectUiHandler {
 
   private getMenuOptionsConfig(): OptionSelectModeConfig {
     const validOptions = getEnumValues(MenuOptions).filter(
-      m => !this.excludedMenus().some(em => em.excluded && em.options.includes(m)),
+      m =>
+        [MenuOptions.GAME_SETTINGS, MenuOptions.SAVE_AND_QUIT].includes(m)
+        && !this.excludedMenus().some(em => em.excluded && em.options.includes(m)),
     );
 
     const options: OptionSelectItem[] = validOptions.map((option: MenuOptions) => {

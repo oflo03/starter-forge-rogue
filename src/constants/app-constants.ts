@@ -18,7 +18,8 @@ export const isApp = import.meta.env.MODE === "app";
 /** `true` if running automated tests via Vitest. */
 export const IS_TEST = import.meta.env.MODE === "test";
 
-export const bypassLogin = import.meta.env.VITE_BYPASS_LOGIN === "1";
+// Starter Forge uses local saves without accounts.
+export const bypassLogin: boolean = true;
 
 /** The ratio at which PRSFX sound volumes are played is adjusted since they are sigificantly louder. */
 export const PRSFX_SOUND_ADJUSTMENT_RATIO = 0.5;

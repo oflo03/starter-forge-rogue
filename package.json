@@ -46,7 +46,7 @@
     "game-data:export": "vitest run --config scripts/game-data-exporter/game-data-exporter.config.ts scripts/game-data-exporter/run.test.ts --",
     "forge:dev": "vite --host 127.0.0.1 --port 5190",
     "forge:build": "vite build --mode production",
-    "forge:test": "vitest run test/tests/forge/registry.test.ts",
+    "forge:test": "vitest run test/tests/forge/",
     "forge:typecheck": "tsc",
     "forge:test:stats": "node --experimental-transform-types --test forge/stats.test.ts",
     "forge:legacy": "vite --config forge/vite.config.ts"

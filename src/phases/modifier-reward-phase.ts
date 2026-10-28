@@ -1,6 +1,6 @@
 import { audioManager } from "#app/global-audio-manager";
 import { globalScene } from "#app/global-scene";
-import type { ModifierType } from "#modifiers/modifier-type";
+import { AddVoucherModifierType, type ModifierType } from "#modifiers/modifier-type";
 import { BattlePhase } from "#phases/battle-phase";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import { getModifierType } from "#utils/modifier-utils";
@@ -26,6 +26,9 @@ export class ModifierRewardPhase extends BattlePhase {
   }
 
   doReward(): Promise<void> {
+    if (globalScene.gameMode.isForge && this.modifierType instanceof AddVoucherModifierType) {
+      return Promise.resolve();
+    }
     return new Promise<void>(resolve => {
       const newModifier = this.modifierType.newModifier();
       globalScene.addModifier(newModifier);

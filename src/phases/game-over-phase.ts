@@ -185,7 +185,7 @@ export class GameOverPhase extends BattlePhase {
           }
 
           const clear = (endCardPhase?: EndCardPhase) => {
-            if (this.isVictory && newClear) {
+            if (this.isVictory && newClear && !globalScene.gameMode.isForge) {
               this.handleUnlocks();
 
               for (const species of this.firstRibbons) {

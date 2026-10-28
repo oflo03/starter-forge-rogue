@@ -5,6 +5,7 @@ import { generateMoveset } from "#ai/ai-moveset-gen";
 import type { Battle } from "#app/battle";
 import type { BattleScene } from "#app/battle-scene";
 import { PLAYER_PARTY_MAX_SIZE, RARE_CANDY_FRIENDSHIP_CAP } from "#app/constants";
+import { forgeAppearance } from "#app/forge/appearance";
 import { audioManager } from "#app/global-audio-manager";
 import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
@@ -776,6 +777,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @returns A promise that resolves once all the corresponding assets have been loaded.
    */
   async loadAssets(ignoreOverride = true, useIllusion = false): Promise<void> {
+    if (this.customPokemonData.forge) {
+      forgeAppearance(this.customPokemonData.types);
+      forgeAppearance(this.customPokemonData.types, true);
+      await loadMoveAnimations(this.getMoveset().map(m => m.getMove().id));
+      this.playAnim();
+      return;
+    }
     /** Promises that are loading assets and can be run concurrently. */
     const loadPromises: Promise<void>[] = [];
     // Assets for moves
@@ -989,6 +997,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   getSpriteKey(ignoreOverride?: boolean): string {
+    if (this.customPokemonData.forge) {
+      return forgeAppearance(this.customPokemonData.types);
+    }
     return this.getSpeciesForm(ignoreOverride, false).getSpriteKey(
       this.getGender(ignoreOverride) === Gender.FEMALE,
       this.formIndex,
@@ -998,6 +1009,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   getBattleSpriteKey(back?: boolean, ignoreOverride?: boolean): string {
+    if (this.customPokemonData.forge) {
+      return forgeAppearance(this.customPokemonData.types);
+    }
     return `pkmn__${this.getBattleSpriteId(back, ignoreOverride)}`;
   }
 
@@ -1036,6 +1050,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   getIconAtlasKey(ignoreOverride = false, useIllusion = true): string {
+    if (this.customPokemonData.forge) {
+      return forgeAppearance(this.customPokemonData.types, true);
+    }
     const illusion = this.summonData.illusion;
     const { formIndex, variant } = useIllusion && illusion ? illusion : this;
     return this.getSpeciesForm(ignoreOverride, useIllusion).getIconAtlasKey(
@@ -1056,6 +1073,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   getIconId(ignoreOverride?: boolean, useIllusion = false): string {
+    if (this.customPokemonData.forge) {
+      return "0001.png";
+    }
     const illusion = this.summonData.illusion;
     const { formIndex, variant } = useIllusion && illusion ? illusion : this;
     return this.getSpeciesForm(ignoreOverride, useIllusion).getIconId(
@@ -1162,9 +1182,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   getSpriteScale(): number {
-    // Keep the custom Pokemon's image slot empty until its artwork is supplied.
-    if (this.customPokemonData.forge && this.customPokemonData.spriteScale === 0) {
-      return 0;
+    if (this.customPokemonData.forge) {
+      return 1;
     }
     const formKey = this.getFormKey();
     if (
@@ -4698,6 +4717,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @param sceneOverride - Optional scene to use instead of the global scene
    */
   public cry(soundConfig?: Phaser.Types.Sound.SoundConfig, sceneOverride?: BattleScene): AnySound | null {
+    if (this.customPokemonData.forge) {
+      return null;
+    }
     const scene = sceneOverride ?? globalScene; // TODO: is `sceneOverride` needed?
     const cry = this.getSpeciesForm(undefined, true).cry(soundConfig);
     if (!cry || audioManager.getVolume(VolumeSetting.FIELD) === 0) {
@@ -4741,6 +4763,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @param callback - A function to be called once the cry has finished playing
    */
   public faintCry(callback: () => any): void {
+    if (this.customPokemonData.forge) {
+      callback();
+      return;
+    }
     if (this.fusionSpecies && this.getSpeciesForm() !== this.getFusionSpeciesForm()) {
       this.fusionFaintCry(callback);
       return;

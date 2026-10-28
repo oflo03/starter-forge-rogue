@@ -3,7 +3,6 @@ import { audioManager } from "#app/global-audio-manager";
 import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
 import { Phase } from "#app/phase";
-import { handleTutorial, Tutorial } from "#app/tutorial";
 import { bypassLogin } from "#constants/app-constants";
 import { PlayerGender } from "#enums/player-gender";
 import { UiMode } from "#enums/ui-mode";
@@ -64,10 +63,9 @@ export class LoginPhase extends Phase {
     globalScene.ui.setMode(UiMode.MESSAGE);
 
     if (settings.general.playerGender === PlayerGender.UNSET) {
-      globalScene.phaseManager.unshiftNew("SelectGenderPhase");
+      settings.update("general", "playerGender", PlayerGender.MALE);
     }
 
-    await handleTutorial(Tutorial.INTRO);
     super.end();
   }
 

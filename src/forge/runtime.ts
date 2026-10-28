@@ -348,6 +348,7 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
           group.map(t => ({ name: typeName(t), value: t })),
         );
         pokemon.customPokemonData.types = [pokemon.customPokemonData.types[0]!, type as RegularPokemonType];
+        await pokemon.loadAssets();
       } else {
         const dominant = stats[1] >= stats[3] ? 1 : 3;
         const selection = await chooseCards(

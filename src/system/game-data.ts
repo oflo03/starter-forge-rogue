@@ -1608,6 +1608,9 @@ export class GameData {
     fromEgg = false,
     showMessage = true,
   ): Promise<boolean> {
+    if (globalScene.gameMode.isForge) {
+      return false;
+    }
     // If incrementCount === false (not a catch scenario), only update the pokemon's dex data if the Pokemon has already been marked as caught in dex
     // Prevents form changes, nature changes, etc. from unintentionally updating the dex data of a "rental" pokemon
     const speciesRootForm = pokemon.species.getRootSpeciesId();
@@ -1811,6 +1814,9 @@ export class GameData {
    * @returns Whether the candy count was incremented
    */
   public addStarterCandy(speciesId: SpeciesId, numCandiesToAdd: number): boolean {
+    if (globalScene.gameMode.isForge) {
+      return false;
+    }
     const { candyCount } = this.starterData[speciesId];
 
     if (candyCount >= MAX_STARTER_CANDY_COUNT) {
