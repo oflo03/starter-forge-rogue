@@ -12,7 +12,10 @@
       "**/tsconfig.json",
       "**/vitest.config.ts",
       "**/test/**",
-      "**/package.json"
+      "**/package.json",
+      "**/*.bat",
+      "**/*.ps1",
+      "**/*.tps"
     ],
     "headers": [
       {
