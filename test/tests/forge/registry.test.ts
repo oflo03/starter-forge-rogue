@@ -11,6 +11,7 @@ import {
 import { configureForgePartner } from "#app/forge/runtime";
 import { AnimConfig, initMoveAnim, loadMoveAnimAssets, moveAnims } from "#data/battle-anims";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { CustomPokemonData } from "#data/pokemon-data";
 import { AbilityId } from "#enums/ability-id";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
@@ -22,6 +23,19 @@ import { describe, expect, it } from "vitest";
 import Catalog from "../../../forge/vendor/catalog.js";
 
 describe("Forge original engine registry", () => {
+  it("preserves five-level reward history when copying evolution and save data", () => {
+    const forge = {
+      seed: "new-rewards",
+      stage: 2 as const,
+      baseStats: [70, 70, 70, 70, 70, 70],
+      events: [11, 16, 21, 26, 31],
+    };
+    const copy = new CustomPokemonData({ forge });
+    expect(copy.forge).toEqual(forge);
+    copy.forge!.events.push(36);
+    expect(forge.events).not.toContain(36);
+    expect(new CustomPokemonData({ forge: { ...forge, events: [12] } }).forge).toBeUndefined();
+  });
   it("adds custom effects once without replacing any original entry", () => {
     const originalMove = allMoves[MoveId.TACKLE];
     const originalAbility = allAbilities[AbilityId.BLAZE];
@@ -108,7 +122,7 @@ describe("Forge original engine registry", () => {
     expect(choices.find(choice => choice.name === "겹겹코트")?.enhancedCategory).toBeUndefined();
   });
 
-  it("applies reward-sized attack boosts and conditional 25-percent damage reduction", () => {
+  it("applies strong reward effects without modifying original abilities", () => {
     const abilities = [
       ...customAbilityChoices([PokemonType.FIRE], [90, 120, 80, 60, 80, 100], "buffs"),
       ...customAbilityChoices([PokemonType.FIRE], [90, 60, 80, 120, 80, 100], "buffs"),
@@ -124,10 +138,10 @@ describe("Forge original engine registry", () => {
       }
       return damage.value;
     };
-    expect(attackDamage("힘자랑", MoveId.TACKLE)).toBe(130);
+    expect(attackDamage("힘자랑", MoveId.TACKLE)).toBe(150);
     expect(attackDamage("힘자랑", MoveId.WATER_GUN)).toBe(100);
-    expect(attackDamage("브레인파워", MoveId.WATER_GUN)).toBe(130);
-    expect(attackDamage("밸런스기어", MoveId.WATER_GUN)).toBe(150);
+    expect(attackDamage("브레인파워", MoveId.WATER_GUN)).toBe(150);
+    expect(attackDamage("밸런스기어", MoveId.WATER_GUN)).toBe(175);
     expect(attackDamage("밸런스기어", MoveId.TACKLE)).toBe(100);
     const coat = allAbilities[abilities.find(ability => ability.name === "겹겹코트")!.id].getAttrs(
       "ReceivedMoveDamageMultiplierAbAttr",
@@ -141,7 +155,7 @@ describe("Forge original engine registry", () => {
     } as PreDefendModifyDamageAbAttrParams;
     expect(coat.canApply(params)).toBe(true);
     coat.apply(params);
-    expect(damage.value).toBe(75);
+    expect(damage.value).toBe(65);
     pokemon.getHpRatio = () => 0.49;
     expect(coat.canApply(params)).toBe(false);
   });
@@ -176,11 +190,51 @@ describe("Forge original engine registry", () => {
         const source = Catalog.getLibrary().moves.find(
           m => m.templateId === template && m.type === PokemonType[type].toLowerCase(),
         );
-        expect(move.power).toBe(source.power);
+        expect(move.power).toBe(Math.max(source.power, move.category === MoveCategory.PHYSICAL ? 80 : 75));
         expect(move.accuracy).toBe(source.accuracy);
         expect(move.pp).toBe(source.pp);
         expect(move.priority).toBe(source.priority);
       }
+    }
+  });
+
+  it("offers distinct burst, utility and tempo choices and respects a chosen attack category", () => {
+    for (let type = 0; type < 18; type++) {
+      const choices = customMoveChoices([type], [90, 120, 80, 60, 80, 100], "strong-reward", [], MoveCategory.SPECIAL);
+      expect(choices).toHaveLength(3);
+      expect(choices.some(move => move.power >= 100)).toBe(true);
+      expect(choices.filter(move => move.category === MoveCategory.SPECIAL).length).toBeGreaterThanOrEqual(2);
+      expect(new Set(choices.map(move => move.id)).size).toBe(3);
+    }
+  });
+
+  it("offers stronger awakenings as new IDs and preserves core ability identities", () => {
+    const stats = [90, 120, 80, 60, 80, 100];
+    const normal = customAbilityChoices([PokemonType.FIRE], stats, "awakening");
+    const awakened = customAbilityChoices([PokemonType.FIRE], stats, "awakening", true);
+    expect(awakened).toHaveLength(3);
+    expect(awakened.every(choice => !normal.some(core => core.id === choice.id))).toBe(true);
+    const attacker = awakened.find(choice => choice.name === "멈추지않는힘")!;
+    expect(allAbilities[attacker.id].getAttrs("PostVictoryAbAttr")).toHaveLength(1);
+    const tank = awakened.find(choice => choice.name === "끝없는숨결")!;
+    expect(allAbilities[tank.id].hasAttr("BlockCritAbAttr")).toBe(true);
+    expect(allAbilities[tank.id].hasAttr("PostTurnHealAbAttr")).toBe(true);
+    expect(normal.find(choice => choice.name === "힘자랑")!.id).toBeLessThan(attacker.id);
+    const ids = new Set(normal.map(choice => choice.id));
+    for (const tier of [1, 2, 3, 4]) {
+      const choices = customAbilityChoices([PokemonType.FIRE], stats, "awakening", tier);
+      expect(choices).toHaveLength(3);
+      for (const choice of choices) {
+        expect(ids.has(choice.id)).toBe(false);
+        ids.add(choice.id);
+      }
+      const offense = choices.find(choice => choice.name.startsWith("멈추지않는힘"))!;
+      const damage = new NumberHolder(100);
+      const params = { move: allMoves[MoveId.TACKLE], damage } as PreAttackModifyDamageAbAttrParams;
+      const boost = allAbilities[offense.id].getAttrs("MoveDamageBoostAbAttr")[0];
+      expect(boost.canApply(params)).toBe(true);
+      boost.apply(params);
+      expect(damage.value).toBeCloseTo([0, 165, 180, 195, 210][tier]);
     }
   });
   it("reuses valid original animations on first load, repeated load and saved move asset reload", async () => {

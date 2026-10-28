@@ -524,6 +524,10 @@ export class InputsController {
     this.buttonLock = [];
   }
 
+  isButtonPressed(button: Button): boolean {
+    return this.buttonLock.includes(button);
+  }
+
   /**
    * Retrieves the active configuration for the currently chosen device.
    * It checks if a specific device ID is stored in configurations and returns it.

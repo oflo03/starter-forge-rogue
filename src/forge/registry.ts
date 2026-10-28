@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import {
+  BlockCritAbAttr,
   LowHpMoveTypePowerBoostAbAttr,
   MoveDamageBoostAbAttr,
+  PostTurnHealAbAttr,
+  PostVictoryStatStageChangeAbAttr,
   ReceivedMoveDamageMultiplierAbAttr,
+  StatMultiplierAbAttr,
 } from "#abilities/ab-attrs";
 import { AbBuilder, type Ability } from "#abilities/ability";
 import { allAbilities, allMoves } from "#data/data-lists";
@@ -146,12 +150,10 @@ export function initializeForgeRegistry(): void {
     }
   }
   const rewardDescriptions: Record<string, string> = {
-    "muscle-focus": "물리 기술의 피해가 1.3배가 됩니다.",
-    "mind-focus": "특수 기술의 피해가 1.3배가 됩니다.",
-    "twin-shell":
-      "HP가 최대치의 절반 이상일 때 받는 공격 피해가 25% 감소합니다. 다단 공격은 각 타격 직전에 판정합니다.",
-    "balanced-gears":
-      "공격과 특공 중 낮은 능력치를 쓰는 타격의 피해가 1.5배가 됩니다. 두 능력치가 같으면 모든 공격 타격에 적용합니다.",
+    "muscle-focus": "물리 기술 피해 1.5배. 직접 상대를 쓰러뜨리면 공격 +1.",
+    "mind-focus": "특수 기술 피해 1.5배. 직접 상대를 쓰러뜨리면 특공 +1.",
+    "twin-shell": "HP가 절반 이상이면 받는 피해 35% 감소. 턴 종료 시 최대 HP의 1/16 회복. 다단 공격은 매 타격 판정.",
+    "balanced-gears": "낮은 공격 능력치를 쓰는 타격 피해 1.75배. 스피드 1.15배. 공격·특공이 같으면 양쪽 모두 강화.",
   };
   for (const key of ["muscle-focus", "mind-focus", "twin-shell", "balanced-gears"]) {
     const source = library.abilities.find(ability => ability.id === key);
@@ -161,26 +163,91 @@ export function initializeForgeRegistry(): void {
     const builder = new AbBuilder(AbilityId.BLAZE, 9);
     switch (key) {
       case "muscle-focus":
-        builder.attr(MoveDamageBoostAbAttr, 1.3, (_user, _target, move) => move.category === MoveCategory.PHYSICAL);
+        builder
+          .attr(MoveDamageBoostAbAttr, 1.5, (_user, _target, move) => move.category === MoveCategory.PHYSICAL)
+          .attr(PostVictoryStatStageChangeAbAttr, [{ stat: Stat.ATK, stages: 1 }]);
         break;
       case "mind-focus":
-        builder.attr(MoveDamageBoostAbAttr, 1.3, (_user, _target, move) => move.category === MoveCategory.SPECIAL);
+        builder
+          .attr(MoveDamageBoostAbAttr, 1.5, (_user, _target, move) => move.category === MoveCategory.SPECIAL)
+          .attr(PostVictoryStatStageChangeAbAttr, [{ stat: Stat.SPATK, stages: 1 }]);
         break;
       case "twin-shell":
-        builder.attr(ReceivedMoveDamageMultiplierAbAttr, pokemon => pokemon.getHpRatio() >= 0.5, 0.75);
+        builder
+          .attr(ReceivedMoveDamageMultiplierAbAttr, pokemon => pokemon.getHpRatio() >= 0.5, 0.65)
+          .attr(PostTurnHealAbAttr);
         break;
       case "balanced-gears":
-        builder.attr(MoveDamageBoostAbAttr, 1.5, (pokemon, _target, move) => {
-          if (!pokemon || move.category === MoveCategory.STATUS) {
-            return false;
-          }
-          const attack = pokemon.getStat(Stat.ATK, false);
-          const special = pokemon.getStat(Stat.SPATK, false);
-          return move.category === MoveCategory.PHYSICAL ? attack <= special : special <= attack;
-        });
+        builder
+          .attr(MoveDamageBoostAbAttr, 1.75, (pokemon, _target, move) => {
+            if (!pokemon || move.category === MoveCategory.STATUS) {
+              return false;
+            }
+            const attack = pokemon.getStat(Stat.ATK, false);
+            const special = pokemon.getStat(Stat.SPATK, false);
+            return move.category === MoveCategory.PHYSICAL ? attack <= special : special <= attack;
+          })
+          .attr(StatMultiplierAbAttr, Stat.SPD, 1.15);
         break;
     }
     registeredAbilities.set(key, addAbility(builder, source.name, rewardDescriptions[key]));
+  }
+  // Append awakenings after the original abilities so existing save IDs remain stable.
+  for (let tier = 1; tier <= 4; tier++) {
+    const suffix = tier === 1 ? "-awakened" : `-awakened-${tier}`;
+    const damage = [0, 1.65, 1.8, 1.95, 2.1][tier];
+    const gear = [0, 1.9, 2.1, 2.3, 2.5][tier];
+    const speed = [0, 1.3, 1.4, 1.5, 1.6][tier];
+    const reduction = [0, 0.75, 0.7, 0.65, 0.6][tier];
+    const grade = tier === 1 ? "" : ` ${["", "", "Ⅱ", "Ⅲ", "Ⅳ"][tier]}`;
+    for (const [key, name, category] of [
+      ["muscle-focus", "멈추지않는힘", MoveCategory.PHYSICAL],
+      ["mind-focus", "솟구치는마음", MoveCategory.SPECIAL],
+    ] as const) {
+      const stat = category === MoveCategory.PHYSICAL ? Stat.ATK : Stat.SPATK;
+      const builder = new AbBuilder(AbilityId.BLAZE, 9)
+        .attr(MoveDamageBoostAbAttr, damage, (_user, _target, move) => move.category === category)
+        .attr(PostVictoryStatStageChangeAbAttr, [
+          { stat, stages: 1 },
+          { stat: Stat.SPD, stages: 1 },
+        ]);
+      registeredAbilities.set(
+        key + suffix,
+        addAbility(
+          builder,
+          name + grade,
+          `${category === MoveCategory.PHYSICAL ? "물리" : "특수"} 피해 ${damage}배. 직접 상대를 쓰러뜨리면 ${category === MoveCategory.PHYSICAL ? "공격" : "특공"}·스피드 +1.`,
+        ),
+      );
+    }
+    registeredAbilities.set(
+      "twin-shell" + suffix,
+      addAbility(
+        new AbBuilder(AbilityId.BLAZE, 9)
+          .attr(ReceivedMoveDamageMultiplierAbAttr, () => true, reduction)
+          .attr(PostTurnHealAbAttr)
+          .attr(BlockCritAbAttr),
+        "끝없는숨결" + grade,
+        `항상 받는 피해 ${Math.round((1 - reduction) * 100)}% 감소. 턴 종료 시 최대 HP의 1/16 회복. 급소에 맞지 않음.`,
+      ),
+    );
+    registeredAbilities.set(
+      "balanced-gears" + suffix,
+      addAbility(
+        new AbBuilder(AbilityId.BLAZE, 9)
+          .attr(MoveDamageBoostAbAttr, gear, (pokemon, _target, move) => {
+            if (!pokemon || move.category === MoveCategory.STATUS) {
+              return false;
+            }
+            const attack = pokemon.getStat(Stat.ATK, false);
+            const special = pokemon.getStat(Stat.SPATK, false);
+            return move.category === MoveCategory.PHYSICAL ? attack <= special : special <= attack;
+          })
+          .attr(StatMultiplierAbAttr, Stat.SPD, speed),
+        "빈틈없는박자" + grade,
+        `낮은 공격 능력치를 쓰는 타격 피해 ${gear}배. 스피드 ${speed}배. 공격·특공이 같으면 양쪽 모두 강화.`,
+      ),
+    );
   }
   // Explicit support list prevents catalog effects from being offered without engine implementations.
   const templates = new Set([
@@ -246,11 +313,29 @@ export function initializeForgeRegistry(): void {
       : ["beam", "erode", "crush"].includes(source.templateId)
         ? Math.round((source.debuffChance ?? 1) * 100)
         : -1;
+    const powerFloors: Record<string, number> = {
+      strike: 100,
+      beam: 110,
+      recoil: 140,
+      "recoil-light": 120,
+      sure: 90,
+      quick: 70,
+      drain: 90,
+      siphon: 90,
+      erode: 95,
+      crush: 110,
+      flinch: 80,
+      "special-flinch": 75,
+      critical: 90,
+    };
+    const power = source.alwaysCrit
+      ? Math.min(70, source.power)
+      : Math.max(source.power, powerFloors[source.templateId] ?? 0);
     const move = new AttackMove(
       MoveId.TACKLE,
       type,
       category,
-      source.power,
+      power,
       source.templateId === "sure" ? -1 : (source.accuracy as number),
       source.pp,
       chance,
@@ -298,7 +383,7 @@ export function initializeForgeRegistry(): void {
       description: source.effect,
       type,
       category,
-      power: source.power,
+      power,
       source,
     });
   }
@@ -342,6 +427,7 @@ export function customMoveChoices(
   stats: Stats,
   seed: string,
   excludedIds: readonly MoveId[] = [],
+  preferredCategory?: MoveCategory,
 ): ForgeMoveChoice[] {
   initializeForgeRegistry();
   const [attack, special] = statsPair(stats);
@@ -353,12 +439,36 @@ export function customMoveChoices(
         || (move.power <= 70 && (move.category === MoveCategory.PHYSICAL ? attack : special) <= 110)),
   );
   const shuffled = seededOrder(candidates, `${seed}:moves`);
-  const preferred = attack >= special ? MoveCategory.PHYSICAL : MoveCategory.SPECIAL;
+  const preferred = preferredCategory ?? (attack >= special ? MoveCategory.PHYSICAL : MoveCategory.SPECIAL);
   const ordered = [
     ...shuffled.filter(move => move.category === preferred),
     ...shuffled.filter(move => move.category !== preferred),
   ];
-  const choices = ordered.slice(0, 3);
+  const choices: typeof ordered = [];
+  for (const predicate of [
+    (move: (typeof ordered)[number]) => move.power >= 100,
+    (move: (typeof ordered)[number]) => ["drain", "siphon", "erode", "crush", "beam"].includes(move.source.templateId),
+    (move: (typeof ordered)[number]) =>
+      move.source.priority > 0
+      || move.source.templateId === "sure"
+      || move.source.templateId === "critical"
+      || move.source.templateId.includes("flinch"),
+  ]) {
+    const candidate = ordered.find(
+      move => predicate(move) && !choices.some(other => other.source.templateId === move.source.templateId),
+    );
+    if (candidate) {
+      choices.push(candidate);
+    }
+  }
+  for (const candidate of ordered) {
+    if (choices.length === 3) {
+      break;
+    }
+    if (!choices.some(move => move.id === candidate.id)) {
+      choices.push(candidate);
+    }
+  }
   if (types.length > 1 && !choices.some(move => move.type === types[1])) {
     const secondary = ordered.find(move => move.type === types[1]);
     if (secondary) {
@@ -368,13 +478,20 @@ export function customMoveChoices(
   return choices.map(({ source: _source, ...choice }) => choice);
 }
 
-export function customAbilityChoices(_types: PokemonType[], stats: Stats, seed: string): ForgeAbilityChoice[] {
+export function customAbilityChoices(
+  _types: PokemonType[],
+  stats: Stats,
+  seed: string,
+  awakened: boolean | number = false,
+): ForgeAbilityChoice[] {
   initializeForgeRegistry();
   const [attack, special] = statsPair(stats);
   const keys = [attack >= special ? "muscle-focus" : "mind-focus", "twin-shell", "balanced-gears"];
   return seededOrder(
     keys.map(key => {
-      const choice = registeredAbilities.get(key)!;
+      const choice = registeredAbilities.get(
+        key + (Number(awakened) > 1 ? `-awakened-${Number(awakened)}` : awakened ? "-awakened" : ""),
+      )!;
       if (key === "twin-shell") {
         return { ...choice };
       }

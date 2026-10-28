@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+
+import { DraftInputGate } from "#app/forge/draft-input";
 import { globalScene } from "#app/global-scene";
 import { Button } from "#enums/buttons";
 import { ModifierTier } from "#enums/modifier-tier";
@@ -32,10 +34,15 @@ export class ForgeDraftUiHandler extends UiHandler {
   private partyText: Phaser.GameObjects.Text | undefined;
   private config: ForgeDraftConfig | undefined;
   private accepted = false;
+  private readonly inputGate = new DraftInputGate();
+  private readonly releaseButton = (event: { button: Button }) => this.inputGate.release(event.button);
+  private readonly releasePointer = () => this.inputGate.releasePointer();
 
   setup(): void {
     this.root = globalScene.add.container(0, -globalScene.scaledCanvas.height).setVisible(false);
     this.getUi().add(this.root);
+    globalScene.game.events.on("input_up", this.releaseButton);
+    globalScene.input.on("pointerup", this.releasePointer);
   }
 
   show(args: any[]): boolean {
@@ -46,6 +53,11 @@ export class ForgeDraftUiHandler extends UiHandler {
     super.show(args);
     this.config = config;
     this.accepted = false;
+    this.inputGate.open(
+      performance.now(),
+      [Button.ACTION, Button.SUBMIT].filter(button => globalScene.inputController?.isButtonPressed?.(button)),
+      globalScene.input.activePointer?.isDown ?? false,
+    );
     this.root.removeAll(true).setVisible(true);
     this.getUi().moveTo(this.root, this.getUi().length - 1);
     this.borders = [];
@@ -133,9 +145,9 @@ export class ForgeDraftUiHandler extends UiHandler {
     return changed;
   }
 
-  private choose(): void {
-    if (!this.active || this.accepted || !this.config) {
-      return;
+  private choose(): boolean {
+    if (!this.active || this.accepted || !this.config || !this.inputGate.confirm(performance.now())) {
+      return false;
     }
     this.getUi().playSelect();
     if (this.cursor === this.config.options.length) {
@@ -145,6 +157,7 @@ export class ForgeDraftUiHandler extends UiHandler {
       this.accepted = true;
       this.config.onChoose(this.cursor);
     }
+    return true;
   }
 
   processInput(button: Button): boolean {
@@ -153,8 +166,12 @@ export class ForgeDraftUiHandler extends UiHandler {
     }
     const count = this.config.options.length;
     if (button === Button.ACTION || button === Button.SUBMIT) {
-      this.choose();
-    } else if (button === Button.LEFT || button === Button.RIGHT) {
+      return this.choose();
+    }
+    if (!this.inputGate.isReady(performance.now())) {
+      return false;
+    }
+    if (button === Button.LEFT || button === Button.RIGHT) {
       const direction = button === Button.LEFT ? -1 : 1;
       this.setCursor((Math.min(this.cursor, count - 1) + direction + count) % count);
     } else if ((button === Button.DOWN || button === Button.UP || button === Button.CANCEL) && this.config.onParty) {
@@ -172,5 +189,10 @@ export class ForgeDraftUiHandler extends UiHandler {
     super.clear();
     this.root.setVisible(false);
     this.setMouseCursorStyle("default");
+  }
+
+  override destroy(): void {
+    globalScene.game.events.off("input_up", this.releaseButton);
+    globalScene.input.off("pointerup", this.releasePointer);
   }
 }

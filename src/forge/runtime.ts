@@ -7,6 +7,7 @@ import { initMoveAnim } from "#data/battle-anims";
 import { allMoves } from "#data/data-lists";
 import { getLevelTotalExp } from "#data/exp";
 import { CustomPokemonData } from "#data/pokemon-data";
+import { Button } from "#enums/buttons";
 import { ModifierTier } from "#enums/modifier-tier";
 import { MoveCategory } from "#enums/move-category";
 import type { MoveId } from "#enums/move-id";
@@ -26,10 +27,11 @@ import i18next from "i18next";
 import { evolutionStats } from "../../forge/stats.ts";
 import Maker from "../../forge/vendor/engine.js";
 import { forgeAppearance, forgeTypeChoice } from "./appearance";
+import { DraftInputGate } from "./draft-input";
 import { animateForgeEvolution } from "./evolution";
+import { FORGE_ABILITY_LEVELS, FORGE_MILESTONES, FORGE_MOVE_LEVELS } from "./progression";
 import { customAbilityChoices, customMoveChoices, starterAbility, starterMoves } from "./registry";
 
-const milestones = [16, 26, 36, 46, 56];
 const types = Array.from({ length: 18 }, (_, i) => i as PokemonType);
 const statKeys = ["hp", "atk", "def", "spa", "spd", "spe"];
 const statNames = ["HP", "공격", "방어", "특공", "특방", "스피드"];
@@ -160,10 +162,18 @@ export function forgeSeedText(): string {
 async function chooseList(title: string, options: { name: string; description?: string; value: any }[]): Promise<any> {
   return new Promise(resolve => {
     const ui = globalScene.ui;
+    const gate = new DraftInputGate();
+    const release = (event: { button: number }) => gate.release(event.button);
+    const releasePointer = () => gate.releasePointer();
     const rows: OptionSelectItem[] = options.map(option => ({
       label: option.name,
       onHover: () => ui.showText(option.description || title, 0),
       handler: () => {
+        if (!gate.confirm(performance.now())) {
+          return false;
+        }
+        globalScene.game.events.off("input_up", release);
+        globalScene.input.off("pointerup", releasePointer);
         ui.setMode(UiMode.MESSAGE);
         resolve(option.value);
         return true;
@@ -172,7 +182,21 @@ async function chooseList(title: string, options: { name: string; description?: 
     ui.showText(
       title,
       0,
-      () => ui.setModeWithoutClear(UiMode.OPTION_SELECT, { options: rows, blockCancelButton: true, maxOptions: 6 }),
+      () => {
+        gate.open(
+          performance.now(),
+          [Button.SUBMIT, Button.ACTION].filter(button => globalScene.inputController?.isButtonPressed?.(button)),
+          globalScene.input.activePointer?.isDown ?? false,
+        );
+        globalScene.game.events.on("input_up", release);
+        globalScene.input.on("pointerup", releasePointer);
+        ui.setModeWithoutClear(UiMode.OPTION_SELECT, {
+          options: rows,
+          blockCancelButton: true,
+          maxOptions: 6,
+          inputDelay: 1200,
+        });
+      },
       null,
       true,
     );
@@ -217,10 +241,11 @@ function moveDescription(id: MoveId): string {
   return `${typeName(move.type)} · ${category} · 위력 ${move.power} · 명중 ${accuracy} · PP ${move.pp}${priority}\n${move.effect}`;
 }
 function enhancedCategory(pokemon: PlayerPokemon, stats: number[]): MoveCategory | undefined {
-  const choice = customAbilityChoices(growthTypes(pokemon), stats, "category").find(
-    o => o.id === pokemon.getAbility(true).id,
-  );
-  if (choice?.name === "밸런스기어") {
+  const choice = [
+    ...customAbilityChoices(growthTypes(pokemon), stats, "category"),
+    ...[1, 2, 3, 4].flatMap(tier => customAbilityChoices(growthTypes(pokemon), stats, "category", tier)),
+  ].find(o => o.id === pokemon.getAbility(true).id);
+  if (choice?.name === "밸런스기어" || choice?.name.startsWith("빈틈없는박자")) {
     return pokemon.stats[1] <= pokemon.stats[3] ? MoveCategory.PHYSICAL : MoveCategory.SPECIAL;
   }
   return choice?.enhancedCategory;
@@ -234,7 +259,7 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
   globalScene.disableMenu = true;
   try {
     const stats = finalStats(data.seed);
-    for (const level of milestones) {
+    for (const level of FORGE_MILESTONES) {
       if (level <= previousLevel || level > pokemon.level || data.events.includes(level)) {
         continue;
       }
@@ -265,12 +290,13 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
       } else if (level === 16) {
         await animateForgeEvolution(pokemon, 2, evolutionStats(stats, 2));
       }
-      if (level === 16 || level === 46) {
+      if (FORGE_MOVE_LEVELS.includes(level)) {
         const options = customMoveChoices(
           growthTypes(pokemon),
           stats,
           seed,
           pokemon.getMoveset(true).map(m => m.moveId),
+          enhancedCategory(pokemon, stats),
         );
         const id: MoveId = await chooseCards(
           `${name} · Lv.${level} · 기술`,
@@ -294,21 +320,23 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
                 || pokemon.getMoveset(true).filter((m, j) => allMoves[j === i ? id : m.moveId].category === category)
                   .length >= required,
             );
-          slot = await chooseList(
-            "교체할 기술을 선택하세요.",
-            replacements.map(({ m, i }) => ({
+          slot = await chooseList("교체할 기술을 선택하세요.", [
+            ...replacements.map(({ m, i }) => ({
               name: allMoves[m.moveId].name,
               description: moveDescription(m.moveId),
               value: i,
             })),
-          );
+            { name: "배우지 않기", value: -1 },
+          ]);
         }
-        await initMoveAnim(id);
-        pokemon.moveset[slot] = new PokemonMove(id);
-      } else if (level === 26) {
-        const options = customAbilityChoices(growthTypes(pokemon), stats, seed);
+        if (slot >= 0) {
+          await initMoveAnim(id);
+          pokemon.moveset[slot] = new PokemonMove(id);
+        }
+      } else if (FORGE_ABILITY_LEVELS.includes(level)) {
+        const options = customAbilityChoices(growthTypes(pokemon), stats, seed, FORGE_ABILITY_LEVELS.indexOf(level));
         const choice = await chooseCards(
-          `${name} · 특성`,
+          `${name} · ${level >= 26 ? "특성 각성" : "특성"}`,
           options.map(o => ({
             name: o.name,
             description: o.description,
@@ -321,7 +349,8 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
           pokemon.fusionCustomPokemonData ??= new CustomPokemonData();
           pokemon.fusionCustomPokemonData.ability = choice.id;
         }
-      } else if (level === 56) {
+      }
+      if (level === 56) {
         const dominant = stats[1] >= stats[3] ? 1 : 3;
         const selection = await chooseCards(
           `${name} · 개체값 조정`,

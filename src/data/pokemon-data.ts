@@ -1,4 +1,5 @@
 import { FORGE_BODIES, type ForgeBody } from "#app/forge/body";
+import { FORGE_MILESTONES } from "#app/forge/progression";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
 import type { BattlerTag } from "#data/battler-tags";
 import { loadBattlerTag, SerializableBattlerTag } from "#data/battler-tags";
@@ -46,7 +47,7 @@ function copyForgePokemonData(data: unknown): ForgePokemonData | undefined {
     || !candidate.baseStats.every(value => Number.isInteger(value) && value >= 1 && value <= 255)
     || ![1, 2, 3].includes(candidate.stage ?? 0)
     || !Array.isArray(candidate.events)
-    || !candidate.events.every(value => [16, 26, 36, 46, 56].includes(value))
+    || !candidate.events.every(value => FORGE_MILESTONES.includes(value))
     || (candidate.name !== undefined && typeof candidate.name !== "string")
   ) {
     return undefined;
