@@ -1734,3 +1734,16 @@ strong {
 .move-empty p {
   margin-bottom: 0;
 }
+
+.enemy-portrait img {
+  width: 144px;
+  height: 144px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+@media (max-width: 600px) {
+  .enemy-portrait img {
+    width: 112px;
+    height: 112px;
+  }
+}

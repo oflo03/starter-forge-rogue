@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 // biome-ignore lint/performance/noNamespaceImport: The test suite exercises the complete public mode API.
 import * as G from "./game.ts";
+import { SPECIES } from "./species.ts";
 import Catalog from "./vendor/catalog.js";
 import Maker from "./vendor/engine.js";
 
@@ -317,4 +318,48 @@ test("every offered enhancement has two compatible unique moves, and later rewar
       }
     }
   }
+});
+
+test("opponents use real species types and base stats through all 60 waves", () => {
+  assert.equal(SPECIES.length, 151);
+  for (const species of SPECIES) {
+    assert.ok(species.types.length > 0 && species.types.length <= 2);
+    assert.equal(new Set(species.types).size, species.types.length);
+    assert.ok(species.types.every(t => G.TYPES.some(v => v.id === t)));
+  }
+  const r = run();
+  for (let wave = 1; wave <= 60; wave++) {
+    for (const m of [r.enemy!, ...r.enemyQueue]) {
+      const species = SPECIES.find(s => s.id === m.speciesId)!;
+      assert.ok(species);
+      assert.equal(m.name, species.name);
+      assert.deepEqual(m.types, species.types);
+      assert.deepEqual(m.base, species.base);
+      assert.equal(m.image, "/pokemon/" + species.id + ".png");
+      assert.ok(species.minLevel <= m.level);
+      assert.equal(m.maxHp, Math.floor(((2 * m.base.hp + m.ivs.hp) * m.level) / 100) + m.level + 10);
+    }
+    assert.ok(r.team.every(m => m.image === null && !m.speciesId));
+    assert.deepEqual(G.restoreRun(JSON.stringify(r)), r);
+    if (wave < 60) {
+      r.phase = "between";
+      r.cleared = r.wave;
+      G.advance(r);
+      resolveGrowth(r);
+    }
+  }
+});
+test("legacy saves migrate only opponent species and preserve HP ratio and the custom team", () => {
+  const r = run();
+  const before = copy(r.team);
+  r.version = "0.1.0";
+  r.enemy!.speciesId = undefined;
+  r.enemy!.image = null;
+  r.enemy!.hp = Math.floor(r.enemy!.maxHp / 2);
+  const ratio = r.enemy!.hp / r.enemy!.maxHp;
+  const restored = G.restoreRun(JSON.stringify(r));
+  assert.equal(restored.version, G.VERSION);
+  assert.ok(restored.enemy!.speciesId);
+  assert.deepEqual(restored.team, before);
+  assert.ok(Math.abs(restored.enemy!.hp / restored.enemy!.maxHp - ratio) <= 1 / restored.enemy!.maxHp);
 });

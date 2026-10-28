@@ -2,11 +2,12 @@
 // Text battle mode in the PokéRogue fork. Shared upstream type chart, maker v1.10 rules.
 import { getTypeChartMultiplier } from "../src/data/type-chart.ts";
 import { PokemonType } from "../src/enums/pokemon-type.ts";
+import { SPECIES } from "./species.ts";
 import Catalog from "./vendor/catalog.js";
 import Maker from "./vendor/engine.js";
 import Fan from "./vendor/fan-content.js";
 
-export const VERSION = "0.1.0";
+export const VERSION = "0.1.1";
 export const STAT_LABELS = { hp: "HP", atk: "공격", def: "방어", spa: "특공", spd: "특방", spe: "스피드" };
 export type Stat = keyof typeof STAT_LABELS;
 export type Stats = Record<Stat, number>;
@@ -160,7 +161,7 @@ export function matchKind(wave: number): "normal" | "rival" | "evil" | "boss" {
   return wave === 60 ? "boss" : wave === 40 ? "evil" : [5, 25, 55].includes(wave) ? "rival" : "normal";
 }
 export function battleStats(mon: Mon): Stats {
-  const factor = mon.stage === 1 ? 0.6 : mon.stage === 2 ? 0.8 : 1;
+  const factor = mon.speciesId ? 1 : mon.stage === 1 ? 0.6 : mon.stage === 2 ? 0.8 : 1;
   return Object.fromEntries(
     STATS.map(key => {
       const base = Math.floor(mon.base[key] * factor);
@@ -727,41 +728,52 @@ export function chooseOption(run: Run, optionId: string, args: { slot?: number; 
   say(run, mon.name + "의 성장: " + o.name + ".");
   nextDraft(run);
 }
+function opponentSpecies(seed: string, level: number, kind: string) {
+  const eligible = SPECIES.filter(s => s.minLevel <= level);
+  const pool = eligible.filter(s => {
+    const total = Object.values(s.base).reduce((a, b) => a + b, 0);
+    return kind === "boss"
+      ? total >= 530
+      : level < 16
+        ? total <= 380
+        : level < 36
+          ? total >= 300 && total <= 500
+          : total >= 400;
+  });
+  return rng(seed + ":species").pick(pool.length > 0 ? pool : eligible);
+}
+function applyOpponentSpecies(mon: Mon, kind: string) {
+  const ratio = mon.maxHp ? mon.hp / mon.maxHp : 1;
+  const species = opponentSpecies(mon.seed, mon.level, kind);
+  mon.speciesId = species.id;
+  mon.name = species.name;
+  mon.types = [...species.types];
+  mon.base = clone(species.base);
+  mon.image = "/pokemon/" + species.id + ".png";
+  mon.maxHp = battleStats(mon).hp;
+  mon.hp = ratio > 0 ? Math.max(1, Math.min(mon.maxHp, Math.round(ratio * mon.maxHp))) : 0;
+}
 function spawnEnemy(run: Run) {
   const kind = matchKind(run.wave);
-  const r = rng(run.mapSeed + ":enemy:" + run.wave);
   const count = kind === "normal" ? 1 : kind === "boss" ? 3 : 2;
   const opponents: Mon[] = [];
   for (let i = 0; i < count; i++) {
-    const type = r.pick(IDS);
-    const mon = creature(run.mapSeed + ":enemy:" + run.wave + ":" + i, type, Math.max(5, run.wave), "enemy-" + i);
-    mon.name =
-      (kind === "rival" ? "라이벌의 " : kind === "evil" ? "악의 조직 " : kind === "boss" ? "심연의 " : "야생의 ")
-      + typeName(type)
-      + " 정령";
+    const seed = run.mapSeed + ":enemy:" + run.wave + ":" + i;
+    const species = opponentSpecies(seed, Math.max(5, run.wave), kind);
+    const mon = creature(seed, species.types[0], Math.max(5, run.wave), "enemy-" + i);
     mon.ivs = Object.fromEntries(STATS.map(k => [k, kind === "normal" ? 8 : kind === "boss" ? 24 : 16])) as Stats;
-    const factor = kind === "normal" ? 0.78 : kind === "boss" ? 1.1 : kind === "rival" ? 0.9 : 1;
-    mon.base = Object.fromEntries(STATS.map(k => [k, Math.round(mon.base[k] * factor)])) as Stats;
-    mon.maxHp = battleStats(mon).hp;
-    mon.hp = mon.maxHp;
-    if (run.wave >= 26) {
-      mon.ability = clone(
-        L.abilities.find(a => a.id === (mon.base.atk >= mon.base.spa ? "muscle-focus" : "mind-focus")),
-      );
-    }
+    applyOpponentSpecies(mon, kind);
     const main = mon.base.atk >= mon.base.spa ? "physical" : "special";
     mon.moves = [
       moveById(
         (run.wave < 16 ? (main === "physical" ? "quick" : "sure") : main === "physical" ? "crush" : "erode")
           + "-"
-          + type,
+          + mon.types[0],
       ),
-      moveById((main === "physical" ? "quick" : "sure") + "-" + r.pick(IDS)),
+      moveById((main === "physical" ? "sure" : "quick") + "-" + (mon.types[1] || mon.types[0])),
     ];
     if (run.wave >= 36) {
-      const second = r.pick(IDS.filter(t => t !== type));
-      mon.types.push(second);
-      mon.moves.push(moveById((main === "physical" ? "drain" : "siphon") + "-" + second));
+      mon.moves.push(moveById((main === "physical" ? "drain" : "siphon") + "-" + (mon.types[1] || mon.types[0])));
     }
     opponents.push(mon);
   }
@@ -1502,7 +1514,7 @@ export function restoreRun(serialized: string): Run {
   }
   if (
     !s
-    || s.version !== VERSION
+    || ![VERSION, "0.1.0"].includes(s.version)
     || !["battle", "between", "draft", "won", "lost"].includes(s.phase)
     || !Number.isInteger(s.wave)
     || s.wave < 1
@@ -1539,6 +1551,20 @@ export function restoreRun(serialized: string): Run {
     || s.turn < 0
   ) {
     throw new Error("이 버전에서 사용할 수 없는 저장 데이터입니다.");
+  }
+  if (s.version === "0.1.0") {
+    for (const mon of [s.enemy, ...(s.enemyQueue || [])]) {
+      if (
+        mon
+        && !mon.speciesId
+        && typeof mon.seed === "string"
+        && Number.isFinite(mon.hp)
+        && Number.isFinite(mon.maxHp)
+      ) {
+        applyOpponentSpecies(mon, matchKind(s.wave));
+      }
+    }
+    s.version = VERSION;
   }
   const text = (v: any, max = 5000) => typeof v === "string" && v.length <= max;
   const validMon = (m: any) =>
