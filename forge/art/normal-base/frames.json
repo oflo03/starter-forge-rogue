@@ -6,27 +6,12 @@
     "file": "agile-stage1-front.png",
     "width": 96,
     "height": 96,
-    "opaque": 533,
+    "opaque": 2060,
     "sourceBounds": {
-      "minX": 83,
-      "minY": 297,
-      "maxX": 411,
-      "maxY": 505
-    }
-  },
-  {
-    "family": "agile",
-    "stage": 1,
-    "view": "back",
-    "file": "agile-stage1-back.png",
-    "width": 96,
-    "height": 96,
-    "opaque": 614,
-    "sourceBounds": {
-      "minX": 66,
-      "minY": 237,
-      "maxX": 365,
-      "maxY": 456
+      "minX": 77,
+      "minY": 215,
+      "maxX": 416,
+      "maxY": 484
     }
   },
   {
@@ -36,27 +21,12 @@
     "file": "agile-stage2-front.png",
     "width": 96,
     "height": 96,
-    "opaque": 1771,
+    "opaque": 2559,
     "sourceBounds": {
-      "minX": 16,
-      "minY": 152,
-      "maxX": 427,
-      "maxY": 505
-    }
-  },
-  {
-    "family": "agile",
-    "stage": 2,
-    "view": "back",
-    "file": "agile-stage2-back.png",
-    "width": 96,
-    "height": 96,
-    "opaque": 1851,
-    "sourceBounds": {
-      "minX": 3,
-      "minY": 92,
-      "maxX": 415,
-      "maxY": 465
+      "minX": 501,
+      "minY": 129,
+      "maxX": 936,
+      "maxY": 481
     }
   },
   {
@@ -66,12 +36,42 @@
     "file": "agile-stage3-front.png",
     "width": 96,
     "height": 96,
-    "opaque": 4188,
+    "opaque": 3145,
     "sourceBounds": {
-      "minX": 0,
-      "minY": 22,
-      "maxX": 497,
-      "maxY": 506
+      "minX": 973,
+      "minY": 24,
+      "maxX": 1522,
+      "maxY": 490
+    }
+  },
+  {
+    "family": "agile",
+    "stage": 1,
+    "view": "back",
+    "file": "agile-stage1-back.png",
+    "width": 96,
+    "height": 96,
+    "opaque": 2124,
+    "sourceBounds": {
+      "minX": 58,
+      "minY": 672,
+      "maxX": 416,
+      "maxY": 981
+    }
+  },
+  {
+    "family": "agile",
+    "stage": 2,
+    "view": "back",
+    "file": "agile-stage2-back.png",
+    "width": 96,
+    "height": 96,
+    "opaque": 3281,
+    "sourceBounds": {
+      "minX": 529,
+      "minY": 610,
+      "maxX": 923,
+      "maxY": 980
     }
   },
   {
@@ -81,12 +81,12 @@
     "file": "agile-stage3-back.png",
     "width": 96,
     "height": 96,
-    "opaque": 4269,
+    "opaque": 3426,
     "sourceBounds": {
-      "minX": 0,
-      "minY": 10,
-      "maxX": 471,
-      "maxY": 459
+      "minX": 988,
+      "minY": 520,
+      "maxX": 1509,
+      "maxY": 983
     }
   },
   {
@@ -96,27 +96,12 @@
     "file": "standard-stage1-front.png",
     "width": 96,
     "height": 96,
-    "opaque": 768,
+    "opaque": 2539,
     "sourceBounds": {
-      "minX": 143,
-      "minY": 312,
-      "maxX": 364,
-      "maxY": 511
-    }
-  },
-  {
-    "family": "standard",
-    "stage": 1,
-    "view": "back",
-    "file": "standard-stage1-back.png",
-    "width": 96,
-    "height": 96,
-    "opaque": 813,
-    "sourceBounds": {
-      "minX": 152,
-      "minY": 248,
-      "maxX": 369,
-      "maxY": 482
+      "minX": 105,
+      "minY": 213,
+      "maxX": 394,
+      "maxY": 494
     }
   },
   {
@@ -126,27 +111,12 @@
     "file": "standard-stage2-front.png",
     "width": 96,
     "height": 96,
-    "opaque": 1755,
+    "opaque": 2788,
     "sourceBounds": {
-      "minX": 94,
-      "minY": 163,
-      "maxX": 390,
-      "maxY": 511
-    }
-  },
-  {
-    "family": "standard",
-    "stage": 2,
-    "view": "back",
-    "file": "standard-stage2-back.png",
-    "width": 96,
-    "height": 96,
-    "opaque": 1692,
-    "sourceBounds": {
-      "minX": 94,
-      "minY": 100,
-      "maxX": 390,
-      "maxY": 482
+      "minX": 586,
+      "minY": 92,
+      "maxX": 914,
+      "maxY": 497
     }
   },
   {
@@ -156,12 +126,42 @@
     "file": "standard-stage3-front.png",
     "width": 96,
     "height": 96,
-    "opaque": 3436,
+    "opaque": 3451,
     "sourceBounds": {
-      "minX": 56,
-      "minY": 15,
-      "maxX": 442,
-      "maxY": 511
+      "minX": 1062,
+      "minY": 21,
+      "maxX": 1458,
+      "maxY": 502
+    }
+  },
+  {
+    "family": "standard",
+    "stage": 1,
+    "view": "back",
+    "file": "standard-stage1-back.png",
+    "width": 96,
+    "height": 96,
+    "opaque": 2532,
+    "sourceBounds": {
+      "minX": 116,
+      "minY": 683,
+      "maxX": 389,
+      "maxY": 973
+    }
+  },
+  {
+    "family": "standard",
+    "stage": 2,
+    "view": "back",
+    "file": "standard-stage2-back.png",
+    "width": 96,
+    "height": 96,
+    "opaque": 2773,
+    "sourceBounds": {
+      "minX": 603,
+      "minY": 561,
+      "maxX": 923,
+      "maxY": 974
     }
   },
   {
@@ -171,12 +171,12 @@
     "file": "standard-stage3-back.png",
     "width": 96,
     "height": 96,
-    "opaque": 3523,
+    "opaque": 3941,
     "sourceBounds": {
-      "minX": 57,
-      "minY": 14,
-      "maxX": 420,
-      "maxY": 482
+      "minX": 1086,
+      "minY": 532,
+      "maxX": 1470,
+      "maxY": 981
     }
   },
   {
@@ -186,27 +186,12 @@
     "file": "sturdy-stage1-front.png",
     "width": 96,
     "height": 96,
-    "opaque": 587,
+    "opaque": 2153,
     "sourceBounds": {
-      "minX": 86,
-      "minY": 331,
-      "maxX": 349,
-      "maxY": 511
-    }
-  },
-  {
-    "family": "sturdy",
-    "stage": 1,
-    "view": "back",
-    "file": "sturdy-stage1-back.png",
-    "width": 96,
-    "height": 96,
-    "opaque": 644,
-    "sourceBounds": {
-      "minX": 60,
-      "minY": 242,
-      "maxX": 343,
-      "maxY": 461
+      "minX": 73,
+      "minY": 221,
+      "maxX": 421,
+      "maxY": 515
     }
   },
   {
@@ -216,27 +201,12 @@
     "file": "sturdy-stage2-front.png",
     "width": 96,
     "height": 96,
-    "opaque": 2174,
+    "opaque": 2964,
     "sourceBounds": {
-      "minX": 0,
-      "minY": 179,
-      "maxX": 318,
-      "maxY": 511
-    }
-  },
-  {
-    "family": "sturdy",
-    "stage": 2,
-    "view": "back",
-    "file": "sturdy-stage2-back.png",
-    "width": 96,
-    "height": 96,
-    "opaque": 2075,
-    "sourceBounds": {
-      "minX": 0,
-      "minY": 157,
-      "maxX": 317,
-      "maxY": 461
+      "minX": 493,
+      "minY": 119,
+      "maxX": 957,
+      "maxY": 510
     }
   },
   {
@@ -246,12 +216,42 @@
     "file": "sturdy-stage3-front.png",
     "width": 96,
     "height": 96,
-    "opaque": 4403,
+    "opaque": 4349,
     "sourceBounds": {
-      "minX": 0,
-      "minY": 37,
-      "maxX": 492,
-      "maxY": 507
+      "minX": 995,
+      "minY": 48,
+      "maxX": 1512,
+      "maxY": 506
+    }
+  },
+  {
+    "family": "sturdy",
+    "stage": 1,
+    "view": "back",
+    "file": "sturdy-stage1-back.png",
+    "width": 96,
+    "height": 96,
+    "opaque": 2103,
+    "sourceBounds": {
+      "minX": 64,
+      "minY": 656,
+      "maxX": 444,
+      "maxY": 970
+    }
+  },
+  {
+    "family": "sturdy",
+    "stage": 2,
+    "view": "back",
+    "file": "sturdy-stage2-back.png",
+    "width": 96,
+    "height": 96,
+    "opaque": 2955,
+    "sourceBounds": {
+      "minX": 528,
+      "minY": 583,
+      "maxX": 997,
+      "maxY": 967
     }
   },
   {
@@ -261,12 +261,12 @@
     "file": "sturdy-stage3-back.png",
     "width": 96,
     "height": 96,
-    "opaque": 4270,
+    "opaque": 4512,
     "sourceBounds": {
-      "minX": 0,
-      "minY": 68,
-      "maxX": 446,
-      "maxY": 465
+      "minX": 1023,
+      "minY": 537,
+      "maxX": 1502,
+      "maxY": 978
     }
   },
   {
@@ -276,27 +276,12 @@
     "file": "heavy-stage1-front.png",
     "width": 96,
     "height": 96,
-    "opaque": 697,
+    "opaque": 2485,
     "sourceBounds": {
-      "minX": 63,
-      "minY": 299,
-      "maxX": 326,
-      "maxY": 511
-    }
-  },
-  {
-    "family": "heavy",
-    "stage": 1,
-    "view": "back",
-    "file": "heavy-stage1-back.png",
-    "width": 96,
-    "height": 96,
-    "opaque": 790,
-    "sourceBounds": {
-      "minX": 79,
-      "minY": 215,
-      "maxX": 336,
-      "maxY": 465
+      "minX": 114,
+      "minY": 217,
+      "maxX": 390,
+      "maxY": 470
     }
   },
   {
@@ -306,27 +291,12 @@
     "file": "heavy-stage2-front.png",
     "width": 96,
     "height": 96,
-    "opaque": 2273,
+    "opaque": 3283,
     "sourceBounds": {
-      "minX": 0,
-      "minY": 143,
-      "maxX": 370,
-      "maxY": 511
-    }
-  },
-  {
-    "family": "heavy",
-    "stage": 2,
-    "view": "back",
-    "file": "heavy-stage2-back.png",
-    "width": 96,
-    "height": 96,
-    "opaque": 1903,
-    "sourceBounds": {
-      "minX": 0,
-      "minY": 72,
-      "maxX": 381,
-      "maxY": 465
+      "minX": 530,
+      "minY": 115,
+      "maxX": 915,
+      "maxY": 472
     }
   },
   {
@@ -336,12 +306,42 @@
     "file": "heavy-stage3-front.png",
     "width": 96,
     "height": 96,
-    "opaque": 4870,
+    "opaque": 4270,
     "sourceBounds": {
-      "minX": 0,
-      "minY": 19,
-      "maxX": 493,
-      "maxY": 511
+      "minX": 1007,
+      "minY": 43,
+      "maxX": 1497,
+      "maxY": 482
+    }
+  },
+  {
+    "family": "heavy",
+    "stage": 1,
+    "view": "back",
+    "file": "heavy-stage1-back.png",
+    "width": 96,
+    "height": 96,
+    "opaque": 2531,
+    "sourceBounds": {
+      "minX": 106,
+      "minY": 692,
+      "maxX": 356,
+      "maxY": 958
+    }
+  },
+  {
+    "family": "heavy",
+    "stage": 2,
+    "view": "back",
+    "file": "heavy-stage2-back.png",
+    "width": 96,
+    "height": 96,
+    "opaque": 3297,
+    "sourceBounds": {
+      "minX": 539,
+      "minY": 578,
+      "maxX": 877,
+      "maxY": 958
     }
   },
   {
@@ -351,12 +351,12 @@
     "file": "heavy-stage3-back.png",
     "width": 96,
     "height": 96,
-    "opaque": 4078,
+    "opaque": 4721,
     "sourceBounds": {
-      "minX": 0,
-      "minY": 31,
-      "maxX": 486,
-      "maxY": 469
+      "minX": 1009,
+      "minY": 523,
+      "maxX": 1455,
+      "maxY": 963
     }
   },
   {
@@ -366,27 +366,12 @@
     "file": "armored-stage1-front.png",
     "width": 96,
     "height": 96,
-    "opaque": 631,
+    "opaque": 1893,
     "sourceBounds": {
-      "minX": 172,
-      "minY": 340,
-      "maxX": 421,
-      "maxY": 511
-    }
-  },
-  {
-    "family": "armored",
-    "stage": 1,
-    "view": "back",
-    "file": "armored-stage1-back.png",
-    "width": 96,
-    "height": 96,
-    "opaque": 681,
-    "sourceBounds": {
-      "minX": 124,
-      "minY": 240,
-      "maxX": 376,
-      "maxY": 447
+      "minX": 80,
+      "minY": 214,
+      "maxX": 449,
+      "maxY": 478
     }
   },
   {
@@ -396,27 +381,12 @@
     "file": "armored-stage2-front.png",
     "width": 96,
     "height": 96,
-    "opaque": 1616,
+    "opaque": 2514,
     "sourceBounds": {
-      "minX": 19,
-      "minY": 223,
-      "maxX": 421,
-      "maxY": 511
-    }
-  },
-  {
-    "family": "armored",
-    "stage": 2,
-    "view": "back",
-    "file": "armored-stage2-back.png",
-    "width": 96,
-    "height": 96,
-    "opaque": 1943,
-    "sourceBounds": {
-      "minX": 0,
-      "minY": 124,
-      "maxX": 353,
-      "maxY": 449
+      "minX": 517,
+      "minY": 147,
+      "maxX": 988,
+      "maxY": 480
     }
   },
   {
@@ -426,12 +396,42 @@
     "file": "armored-stage3-front.png",
     "width": 96,
     "height": 96,
-    "opaque": 4427,
+    "opaque": 3599,
     "sourceBounds": {
-      "minX": 0,
-      "minY": 70,
-      "maxX": 487,
-      "maxY": 511
+      "minX": 1004,
+      "minY": 92,
+      "maxX": 1518,
+      "maxY": 477
+    }
+  },
+  {
+    "family": "armored",
+    "stage": 1,
+    "view": "back",
+    "file": "armored-stage1-back.png",
+    "width": 96,
+    "height": 96,
+    "opaque": 2123,
+    "sourceBounds": {
+      "minX": 64,
+      "minY": 671,
+      "maxX": 402,
+      "maxY": 943
+    }
+  },
+  {
+    "family": "armored",
+    "stage": 2,
+    "view": "back",
+    "file": "armored-stage2-back.png",
+    "width": 96,
+    "height": 96,
+    "opaque": 2830,
+    "sourceBounds": {
+      "minX": 507,
+      "minY": 597,
+      "maxX": 938,
+      "maxY": 948
     }
   },
   {
@@ -441,12 +441,12 @@
     "file": "armored-stage3-back.png",
     "width": 96,
     "height": 96,
-    "opaque": 3965,
+    "opaque": 3458,
     "sourceBounds": {
-      "minX": 0,
-      "minY": 51,
-      "maxX": 473,
-      "maxY": 464
+      "minX": 978,
+      "minY": 568,
+      "maxX": 1497,
+      "maxY": 948
     }
   },
   {
@@ -456,27 +456,12 @@
     "file": "soft-stage1-front.png",
     "width": 96,
     "height": 96,
-    "opaque": 581,
+    "opaque": 2790,
     "sourceBounds": {
-      "minX": 138,
-      "minY": 370,
-      "maxX": 360,
-      "maxY": 511
-    }
-  },
-  {
-    "family": "soft",
-    "stage": 1,
-    "view": "back",
-    "file": "soft-stage1-back.png",
-    "width": 96,
-    "height": 96,
-    "opaque": 821,
-    "sourceBounds": {
-      "minX": 136,
-      "minY": 286,
-      "maxX": 342,
-      "maxY": 465
+      "minX": 111,
+      "minY": 177,
+      "maxX": 407,
+      "maxY": 467
     }
   },
   {
@@ -486,27 +471,12 @@
     "file": "soft-stage2-front.png",
     "width": 96,
     "height": 96,
-    "opaque": 1843,
+    "opaque": 4070,
     "sourceBounds": {
-      "minX": 31,
-      "minY": 239,
-      "maxX": 388,
-      "maxY": 511
-    }
-  },
-  {
-    "family": "soft",
-    "stage": 2,
-    "view": "back",
-    "file": "soft-stage2-back.png",
-    "width": 96,
-    "height": 96,
-    "opaque": 2092,
-    "sourceBounds": {
-      "minX": 26,
-      "minY": 165,
-      "maxX": 381,
-      "maxY": 466
+      "minX": 539,
+      "minY": 83,
+      "maxX": 933,
+      "maxY": 474
     }
   },
   {
@@ -516,12 +486,42 @@
     "file": "soft-stage3-front.png",
     "width": 96,
     "height": 96,
-    "opaque": 5122,
+    "opaque": 4887,
     "sourceBounds": {
-      "minX": 0,
-      "minY": 30,
-      "maxX": 496,
-      "maxY": 511
+      "minX": 1010,
+      "minY": 39,
+      "maxX": 1503,
+      "maxY": 488
+    }
+  },
+  {
+    "family": "soft",
+    "stage": 1,
+    "view": "back",
+    "file": "soft-stage1-back.png",
+    "width": 96,
+    "height": 96,
+    "opaque": 2629,
+    "sourceBounds": {
+      "minX": 101,
+      "minY": 655,
+      "maxX": 405,
+      "maxY": 945
+    }
+  },
+  {
+    "family": "soft",
+    "stage": 2,
+    "view": "back",
+    "file": "soft-stage2-back.png",
+    "width": 96,
+    "height": 96,
+    "opaque": 4024,
+    "sourceBounds": {
+      "minX": 537,
+      "minY": 577,
+      "maxX": 932,
+      "maxY": 969
     }
   },
   {
@@ -531,12 +531,12 @@
     "file": "soft-stage3-back.png",
     "width": 96,
     "height": 96,
-    "opaque": 4726,
+    "opaque": 5027,
     "sourceBounds": {
-      "minX": 0,
-      "minY": 27,
-      "maxX": 490,
-      "maxY": 474
+      "minX": 1010,
+      "minY": 533,
+      "maxX": 1502,
+      "maxY": 983
     }
   }
 ]

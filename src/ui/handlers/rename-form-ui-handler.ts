@@ -21,10 +21,7 @@ export class RenameFormUiHandler extends FormModalUiHandler {
     this.partnerPreview?.destroy();
     this.partnerPreview = undefined;
     if (config?.previewTexture) {
-      this.partnerPreview = globalScene.add
-        .image(80, 94, config.previewTexture)
-        .setOrigin(0.5, 1)
-        .setCrop(0, 28, 96, 68);
+      this.partnerPreview = globalScene.add.image(80, 62, config.previewTexture).setOrigin(0.5);
       this.modalContainer.add(this.partnerPreview);
     }
   }

@@ -37,30 +37,37 @@ export function forgeAppearance(
     recolorForgePixels(pixels.data, values);
     context.putImageData(pixels, 0, 0);
   }
-  // Pixel digits stay readable at party-icon size without depending on canvas fonts.
-  const digits = [
-    [],
-    ["010", "110", "010", "010", "111"],
-    ["111", "001", "111", "100", "111"],
-    ["111", "001", "111", "001", "111"],
-  ];
-  const pixel = icon ? 1 : 3;
-  const x = icon ? 24 : 73;
-  const y = icon ? 2 : 7;
-  context.fillStyle = "#20202a";
-  context.fillRect(x - pixel, y - pixel, 5 * pixel, 7 * pixel);
-  context.fillStyle = "#ffffff";
-  digits[stage].forEach((row, dy) =>
-    Array.from(row).forEach((value, dx) => {
-      if (value === "1") {
-        context.fillRect(x + dx * pixel, y + dy * pixel, pixel, pixel);
-      }
-    }),
-  );
   texture.add("0001.png", 0, 0, 0, size, size);
   texture.refresh();
   if (!icon && !globalScene.anims.exists(key)) {
     globalScene.anims.create({ key, frames: [{ key, frame: "0001.png" }], frameRate: 10, repeat: -1 });
   }
+  return key;
+}
+
+/** Encounter choices reveal only the original type symbol, never the creature. */
+export function forgeTypeChoice(type: PokemonType): string {
+  const key = `forge-type-choice-${type}`;
+  if (globalScene.textures.exists(key)) {
+    return key;
+  }
+  const frame = globalScene.textures.getFrame("pbinfo_player_type", PokemonType[type].toLowerCase());
+  const texture = globalScene.textures.createCanvas(key, 64, 64)!;
+  const context = texture.getContext();
+  context.imageSmoothingEnabled = false;
+  const width = frame.cutWidth * 2;
+  const height = frame.cutHeight * 2;
+  context.drawImage(
+    frame.source.image as HTMLImageElement,
+    frame.cutX,
+    frame.cutY,
+    frame.cutWidth,
+    frame.cutHeight,
+    (64 - width) / 2,
+    (64 - height) / 2,
+    width,
+    height,
+  );
+  texture.refresh();
   return key;
 }

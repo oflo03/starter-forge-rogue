@@ -21,3 +21,7 @@ Replaced temporary type badges with 36 original neutral pixel frames: six body f
 
 ## Partner encounter selection
 First and wave-10 encounters reuse native reward selection: three distinct seeded type candidates, selected creature preview during naming, identical permanent type/body through battle. Wave-20 third recruitment removed. Native desktop/mobile flow checks selected second candidate, nickname validation, starting money and battle turn 2; dedicated recruitment check chooses third candidate for partner two and proves no wave-20 recruitment.
+
+
+## 2026-10-29: sprite readability and hidden encounter identity
+Redrew all six source families with broader pixel clusters and five solid output shades. Increased stage1 from36 to64 pixels, stage2 to76 and stage3 to86; all36 actual alpha bounds centered on96px frames with >=5px final margins. Fixed actual clipping: generated anatomy crossed nominal equal sheet boundaries, so packing now locates six whole connected creatures before extracting. Removed all stage digits and fixed naming crop. Encounter cards render only original type atlas icons; creature textures first generated after choice, then entire centered creature shown while naming. Native browser asserts36 geometry cases, no creature textures before initial choice, matching selected type in naming/battle, second recruit selection and no third recruit.

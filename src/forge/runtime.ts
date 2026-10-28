@@ -25,7 +25,7 @@ import { getPokemonTypeLocaleKey } from "#utils/i18n";
 import i18next from "i18next";
 import { evolutionStats } from "../../forge/stats.ts";
 import Maker from "../../forge/vendor/engine.js";
-import { forgeAppearance } from "./appearance";
+import { forgeAppearance, forgeTypeChoice } from "./appearance";
 import { customAbilityChoices, customMoveChoices, starterAbility, starterMoves } from "./registry";
 
 const milestones = [16, 26, 36, 46, 56];
@@ -111,7 +111,7 @@ export async function meetForgePartner(
       name: typeName(type),
       description: `${typeName(type)} 타입 · Lv.${level}\n이 타입의 파트너와 함께합니다. 선택 후 모습을 보고 이름을 지어 주세요.`,
       value: type,
-      previewTexture: forgeAppearance([type], false, 1, body),
+      previewTexture: forgeTypeChoice(type),
     })),
     seed,
   );
