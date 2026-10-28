@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { BODY_ROLES, FORGE_BODIES, forgeBodyForSeed } from "#app/forge/body";
-import { FORGE_SHADES, forgePalette, recolorForgePixels } from "#app/forge/palette";
+import { FORGE_SHADES, FORGE_TYPE_COLORS, forgePalette, recolorForgePixels } from "#app/forge/palette";
 import { CustomPokemonData } from "#data/pokemon-data";
 import { PokemonType } from "#enums/pokemon-type";
 import { readdirSync, readFileSync } from "node:fs";
@@ -64,9 +64,21 @@ describe("Forge reusable sprite system", () => {
     }
     const dual = forgePalette([PokemonType.FIRE, PokemonType.WATER]);
     expect(dual[3]).toEqual(forgePalette([PokemonType.FIRE])[3]);
-    expect(dual[5]).toEqual(forgePalette([PokemonType.WATER])[5]);
+    expect(dual[5]).not.toEqual(forgePalette([PokemonType.FIRE])[5]);
+    expect(dual[5]).not.toEqual(forgePalette([PokemonType.WATER])[5]);
     expect(dual[0]).toEqual(forgePalette([PokemonType.NORMAL])[0]);
     expect(dual[7]).toEqual(forgePalette([PokemonType.NORMAL])[7]);
+  });
+
+  it("assigns a distinct body and marking color to every monotype", () => {
+    expect(FORGE_TYPE_COLORS).toHaveLength(18);
+    for (let type = 0; type < 18; type++) {
+      const [body, marking] = FORGE_TYPE_COLORS[type];
+      expect(body).not.toEqual(marking);
+      const palette = forgePalette([type]);
+      expect(palette[4]).not.toEqual(palette[6]);
+      expect(palette[6]).toEqual(forgePalette([type, type])[6]);
+    }
   });
 
   it("preserves a saved body family and supports older saves without it", () => {

@@ -1,3 +1,4 @@
+import { FORGE_TRAINER_LEVELS, forgeEnemyIvLimit } from "#app/forge/balance";
 import { globalScene } from "#app/global-scene";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { signatureSpecies } from "#balance/signature-species";
@@ -254,6 +255,9 @@ export class Trainer extends Phaser.GameObjects.Container {
   }
 
   getPartyTemplate(): TrainerPartyTemplate {
+    if (globalScene.gameMode.isForge && globalScene.currentBattle?.waveIndex === 40) {
+      return new TrainerPartyTemplate(4, PartyMemberStrength.AVERAGE);
+    }
     if (this.config.partyTemplateFunc) {
       return this.config.partyTemplateFunc();
     }
@@ -261,6 +265,9 @@ export class Trainer extends Phaser.GameObjects.Container {
   }
 
   public getPartyLevels(waveIndex: number): number[] {
+    if (globalScene.gameMode.isForge && FORGE_TRAINER_LEVELS[waveIndex]) {
+      return [...FORGE_TRAINER_LEVELS[waveIndex]];
+    }
     const ret: number[] = [];
     let partyTemplate = this.getPartyTemplate();
 
@@ -317,6 +324,8 @@ export class Trainer extends Phaser.GameObjects.Container {
   public genPartyMember(index: number): EnemyPokemon {
     const battle = globalScene.currentBattle;
     const level = battle.enemyLevels?.[index]!; // TODO: is this bang correct?
+    const forgeMidboss = globalScene.gameMode.isForge && battle.waveIndex === 40;
+    const sourceIndex = forgeMidboss ? [0, 1, 2, 5][index] : index;
 
     let ret!: EnemyPokemon;
     const genMon = () => {
@@ -324,8 +333,8 @@ export class Trainer extends Phaser.GameObjects.Container {
       const strength: PartyMemberStrength = template.getStrength(index);
 
       if (!(this.config.trainerTypeDouble && this.isDouble() && !this.config.doubleOnly)) {
-        if (Object.hasOwn(this.config.partyMemberFuncs, index)) {
-          ret = this.config.partyMemberFuncs[index](level, strength, template.getEvoThresholdKind(index));
+        if (Object.hasOwn(this.config.partyMemberFuncs, sourceIndex)) {
+          ret = this.config.partyMemberFuncs[sourceIndex](level, strength, template.getEvoThresholdKind(index));
           this.representedSpecies[ret.species.speciesId] = speciesDataRegistry.getPrevolutionChain(
             ret.species.speciesId,
           );
@@ -451,7 +460,24 @@ export class Trainer extends Phaser.GameObjects.Container {
         + (this.config.getDerivedType() << 10)
         + (((this.config.useSameSeedForAllMembers ? 0 : index) + 1) << 8);
 
-    globalScene.executeWithSeedOffset(genMon, seedOffset);
+    globalScene.executeWithSeedOffset(() => {
+      genMon();
+      if (forgeMidboss && (ret.species.legendary || ret.species.subLegendary || ret.species.mythical)) {
+        ret.destroy();
+        ret = this.config.partyMemberFuncs[4](
+          level,
+          this.getPartyTemplate().getStrength(index),
+          this.getPartyTemplate().getEvoThresholdKind(index),
+        );
+      }
+      if (globalScene.gameMode.isForge) {
+        ret.setBoss(false);
+        ret.initBattleInfo();
+        ret.ivs = ret.ivs.map(iv => Math.min(iv, forgeEnemyIvLimit(battle.waveIndex)));
+        ret.calculateStats();
+        ret.hp = ret.getMaxHp();
+      }
+    }, seedOffset);
 
     return ret;
   }

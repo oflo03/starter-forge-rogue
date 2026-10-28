@@ -16,16 +16,17 @@ import type { PokemonType, RegularPokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
-import { ModifierType, ModifierTypeOption, TmModifierType } from "#modifiers/modifier-type";
 import { PokemonMove } from "#moves/pokemon-move";
 import type { Starter } from "#types/save-data";
 import type { FormModalConfig, OptionSelectItem } from "#types/ui-types";
+import type { ForgeDraftConfig, ForgeDraftOption } from "#ui/forge-draft-ui-handler";
 import type { RenameFormUiHandler } from "#ui/rename-form-ui-handler";
 import { getPokemonTypeLocaleKey } from "#utils/i18n";
 import i18next from "i18next";
 import { evolutionStats } from "../../forge/stats.ts";
 import Maker from "../../forge/vendor/engine.js";
 import { forgeAppearance, forgeTypeChoice } from "./appearance";
+import { animateForgeEvolution } from "./evolution";
 import { customAbilityChoices, customMoveChoices, starterAbility, starterMoves } from "./registry";
 
 const milestones = [16, 26, 36, 46, 56];
@@ -106,10 +107,10 @@ export async function meetForgePartner(
   const body = forgeBodyForSeed(seed);
   const previousMenuState = globalScene.disableMenu;
   const type: PokemonType = await chooseCards(
-    "함께 모험할 파트너의 타입을 고르세요.",
+    `파트너 타입 · Lv.${level}`,
     candidates.map(type => ({
       name: typeName(type),
-      description: `${typeName(type)} 타입 · Lv.${level}\n이 타입의 파트너와 함께합니다. 선택 후 모습을 보고 이름을 지어 주세요.`,
+      description: "",
       value: type,
       previewTexture: forgeTypeChoice(type),
     })),
@@ -118,9 +119,7 @@ export async function meetForgePartner(
   globalScene.disableMenu = previousMenuState;
   const species = originalSpecies(type, seed);
   await globalScene.ui.setMode(UiMode.MESSAGE);
-  await globalScene.ui.showTextPromise(
-    `새로운 파트너를 만났습니다!\n${typeName(type)} 타입 · Lv.${level}. 이름을 지어 주세요.`,
-  );
+
   const name = await nickname(forgeAppearance([type], false, 1, body));
   return {
     seed,
@@ -183,52 +182,62 @@ function rewardTier(seed: string): ModifierTier {
   const n = Maker.createRng(globalScene.seed + ":reward:" + seed).int(1, 100);
   return n <= 65 ? ModifierTier.COMMON : n <= 90 ? ModifierTier.GREAT : ModifierTier.ULTRA;
 }
-async function chooseCards(
-  title: string,
-  options: { name: string; description: string; value: any; moveId?: MoveId; previewTexture?: string }[],
-  seed: string,
-): Promise<any> {
-  await globalScene.ui.setMode(UiMode.MESSAGE);
-  await globalScene.ui.showTextPromise(title);
-  const tier = rewardTier(seed.split(":tier:")[0]);
-  const items = options.map((option, i) => {
-    const item =
-      option.moveId === undefined
-        ? new ModifierType("modifierType:RareCandyModifierType", "rare_candy", null)
-        : new TmModifierType(option.moveId);
-    item.id = "forge-reward-" + i;
-    if (option.previewTexture) {
-      item.previewTexture = option.previewTexture;
-    }
-    item.setTier(tier);
-    Object.defineProperty(item, "name", { get: () => option.name });
-    item.getDescription = () => option.description;
-    return new ModifierTypeOption(item, 0);
-  });
-  return new Promise(resolve => {
-    const show = () =>
-      globalScene.ui.setMode(
-        UiMode.MODIFIER_SELECT,
-        true,
-        items,
-        (row: number, index: number) => {
-          if (row === 0 && index === 2) {
-            if (globalScene.getPlayerParty().length === 0) {
-              return false;
-            }
-            globalScene.ui.setModeWithoutClear(UiMode.PARTY, PartyUiMode.CHECK, -1, show);
-            return true;
-          }
-          if (row !== 1 || index < 0 || index >= options.length) {
-            return false;
-          }
-          globalScene.ui.setMode(UiMode.MESSAGE).then(() => resolve(options[index].value));
-          return true;
+async function chooseCards(title: string, options: ForgeDraftOption[], seed: string): Promise<any> {
+  const ui = globalScene.ui;
+  const previousMenuState = globalScene.disableMenu;
+  globalScene.disableMenu = true;
+  ui.clearText();
+  try {
+    return await new Promise(resolve => {
+      const show = () => ui.setMode(UiMode.FORGE_DRAFT, config);
+      const config: ForgeDraftConfig = {
+        title,
+        options,
+        tier: rewardTier(seed.split(":tier:")[0]),
+        onChoose: index => {
+          ui.setMode(UiMode.MESSAGE).then(() => resolve(options[index].value));
         },
-        -1,
-      );
-    show();
-  });
+        ...(globalScene.getPlayerParty().length > 0
+          ? {
+              onParty: () => ui.setModeWithoutClear(UiMode.PARTY, PartyUiMode.CHECK, -1, show),
+            }
+          : {}),
+      };
+      show();
+    });
+  } finally {
+    globalScene.disableMenu = previousMenuState;
+  }
+}
+async function offerForgeLinkedMove(pokemon: PlayerPokemon, id: MoveId, seed: string): Promise<void> {
+  if (pokemon.getMoveset(true).some(move => move.moveId === id)) {
+    return;
+  }
+  const learn = await chooseCards(
+    pokemon.getNameToRender({ useIllusion: false }) + " · 연계 기술",
+    [
+      { name: allMoves[id].name, description: moveDescription(id), value: true, moveId: id },
+      { name: "배우지 않기", description: "", value: false },
+    ],
+    seed,
+  );
+  if (!learn) {
+    return;
+  }
+  let slot = pokemon.getMoveset(true).length;
+  if (slot >= 4) {
+    slot = await chooseList("교체할 기술", [
+      ...pokemon
+        .getMoveset(true)
+        .map((move, index) => ({ name: move.getName(), description: moveDescription(move.moveId), value: index })),
+      { name: "취소", value: -1 },
+    ]);
+    if (slot < 0) {
+      return;
+    }
+  }
+  await initMoveAnim(id);
+  pokemon.setMove(slot, id);
 }
 function moveDescription(id: MoveId): string {
   const move = allMoves[id];
@@ -276,17 +285,33 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
       if (level <= previousLevel || level > pokemon.level || data.events.includes(level)) {
         continue;
       }
-      if (level === 16 || level === 36) {
-        data.stage = level === 16 ? 2 : 3;
-        data.baseStats = evolutionStats(stats, data.stage);
-        pokemon.calculateStats();
-        await pokemon.loadAssets();
-        await pokemon.updateInfo();
-      }
       const rewardBase = data.seed + ":reward:" + level;
       const rarity = rewardTier(rewardBase);
       const seed = rewardBase + ":tier:" + rarity;
       const name = pokemon.getNameToRender({ useIllusion: false });
+      if (level === 36) {
+        const remaining = types.filter(t => !growthTypes(pokemon).includes(t));
+        const groups = [remaining.slice(0, 6), remaining.slice(6, 12), remaining.slice(12)];
+        const group: PokemonType[] = await chooseCards(
+          `${name} · 추가 타입`,
+          groups.map((values, i) => ({
+            name: ["새로운 가능성", "다른 빛깔", "마지막 퍼즐"][i],
+            description: values.map(typeName).join(" · "),
+            value: values,
+          })),
+          seed,
+        );
+        const type: PokemonType = await chooseList(
+          "추가 타입",
+          group.map(t => ({ name: typeName(t), value: t })),
+        );
+        await animateForgeEvolution(pokemon, 3, evolutionStats(stats, 3), [
+          pokemon.customPokemonData.types[0]!,
+          type as RegularPokemonType,
+        ]);
+      } else if (level === 16) {
+        await animateForgeEvolution(pokemon, 2, evolutionStats(stats, 2));
+      }
       if (level === 16 || level === 46) {
         const options = customMoveChoices(
           growthTypes(pokemon),
@@ -295,7 +320,7 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
           pokemon.getMoveset(true).map(m => m.moveId),
         );
         const id: MoveId = await chooseCards(
-          `${name} · ${level === 16 ? "첫 진화 · " : ""}Lv.${level}\n새로운 기술을 선택하세요.`,
+          `${name} · Lv.${level} · 기술`,
           options.map(o => ({ name: o.name, description: moveDescription(o.id), value: o.id, moveId: o.id })),
           seed,
         );
@@ -330,16 +355,16 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
       } else if (level === 26) {
         const options = customAbilityChoices(growthTypes(pokemon), stats, seed);
         const choice = await chooseCards(
-          `${name} · 특성을 선택하세요.`,
+          `${name} · 특성`,
           options.map(o => ({
             name: o.name,
             description:
               o.description
               + (o.enhancedCategory === undefined
                 ? ""
-                : `\n함께 습득: ${linkedMoves(pokemon, stats, seed, o.id)
+                : `\n연계 후보: ${linkedMoves(pokemon, stats, seed, o.id)
                     .map(m => m.name)
-                    .join(" · ")}\n기존 기술을 최대 2개 남기고 연계 기술 2개를 배웁니다.`),
+                    .join(" · ")}`),
             value: o,
           })),
           seed,
@@ -355,34 +380,11 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
           if (linked.length !== 2) {
             throw new Error("연계 기술2개를 만들 수 없습니다.");
           }
-          const kept = pokemon
-            .getMoveset()
-            .filter(m => !linked.some(l => l.id === m.moveId))
-            .slice(0, 2);
           for (const move of linked) {
-            await initMoveAnim(move.id);
+            await offerForgeLinkedMove(pokemon, move.id, seed);
           }
-          pokemon.moveset = kept.concat(linked.map(m => new PokemonMove(m.id)));
         }
-      } else if (level === 36) {
-        const remaining = types.filter(t => !growthTypes(pokemon).includes(t));
-        const groups = [remaining.slice(0, 6), remaining.slice(6, 12), remaining.slice(12)];
-        const group: PokemonType[] = await chooseCards(
-          `${name} · 최종 진화\n두 번째 타입을 선택하세요.`,
-          groups.map((values, i) => ({
-            name: ["새로운 가능성", "다른 빛깔", "마지막 퍼즐"][i],
-            description: values.map(typeName).join(" · "),
-            value: values,
-          })),
-          seed,
-        );
-        const type: PokemonType = await chooseList(
-          "추가 타입",
-          group.map(t => ({ name: typeName(t), value: t })),
-        );
-        pokemon.customPokemonData.types = [pokemon.customPokemonData.types[0]!, type as RegularPokemonType];
-        await pokemon.loadAssets();
-      } else {
+      } else if (level === 56) {
         const dominant = stats[1] >= stats[3] ? 1 : 3;
         const selection = await chooseCards(
           `${name} · 개체값 조정`,

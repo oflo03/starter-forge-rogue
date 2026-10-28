@@ -220,7 +220,7 @@ export class EvolutionPhase extends Phase {
   /**
    * Adds the evolution tween and begins playing it
    */
-  private playEvolutionAnimation(evolvedPokemon: Pokemon): void {
+  protected playEvolutionAnimation(evolvedPokemon: Pokemon): void {
     globalScene.time.delayedCall(1000, () => {
       this.evolutionBgm = audioManager.replaceBgmUntilEnd("bw/evolution");
       globalScene.tweens.add({
@@ -390,23 +390,20 @@ export class EvolutionPhase extends Phase {
         audioManager.replaceBgmUntilEnd("bw/evolution_fanfare");
 
         evolvedPokemon.destroy();
-        globalScene.ui.showText(
-          i18next.t("menu:evolutionDone", {
-            pokemonName: this.preEvolvedPokemonName,
-            evolvedPokemonName: this.pokemon.name,
-          }),
-          null,
-          () => this.end(),
-          null,
-          true,
-          fixedInt(4000),
-        );
+        globalScene.ui.showText(this.getEvolutionDoneMessage(), null, () => this.end(), null, true, fixedInt(4000));
         globalScene.time.delayedCall(fixedInt(4250), () => audioManager.playBgm());
       });
     });
   }
 
-  private postEvolve(evolvedPokemon: Pokemon): void {
+  protected getEvolutionDoneMessage(): string {
+    return i18next.t("menu:evolutionDone", {
+      pokemonName: this.preEvolvedPokemonName,
+      evolvedPokemonName: this.pokemon.name,
+    });
+  }
+
+  protected queuePostEvolutionPhases(): void {
     const learnSituation: LearnMoveSituation = this.fusionSpeciesEvolved
       ? LearnMoveSituation.EVOLUTION_FUSED
       : this.pokemon.fusionSpecies
@@ -419,6 +416,10 @@ export class EvolutionPhase extends Phase {
       globalScene.phaseManager.unshiftNew("LearnMovePhase", globalScene.getPlayerParty().indexOf(this.pokemon), lm[1]);
     }
     globalScene.phaseManager.unshiftNew("EndEvolutionPhase");
+  }
+
+  protected postEvolve(evolvedPokemon: Pokemon): void {
+    this.queuePostEvolutionPhases();
 
     audioManager.playSound("se/shine");
     globalScene.animations.doSpray(this.evolutionBaseBg, this.evolutionContainer);
@@ -465,7 +466,11 @@ export class EvolutionPhase extends Phase {
     globalScene.time.delayedCall(900, () => {
       this.evolutionHandler.canCancel = this.canCancel;
 
-      this.pokemon.evolve(this.evolution, this.pokemon.species).then(() => this.postEvolve(evolvedPokemon));
+      this.applyEvolution().then(() => this.postEvolve(evolvedPokemon));
     });
+  }
+
+  protected applyEvolution(): Promise<void> {
+    return this.pokemon.evolve(this.evolution, this.pokemon.species);
   }
 }

@@ -27,6 +27,7 @@ import { EggListUiHandler } from "#ui/egg-list-ui-handler";
 import { EggSummaryUiHandler } from "#ui/egg-summary-ui-handler";
 import { EvolutionSceneUiHandler } from "#ui/evolution-scene-ui-handler";
 import { FightUiHandler } from "#ui/fight-ui-handler";
+import { ForgeDraftUiHandler } from "#ui/forge-draft-ui-handler";
 import { GameStatsUiHandler } from "#ui/game-stats-ui-handler";
 import { GamepadBindingUiHandler } from "#ui/gamepad-binding-ui-handler";
 import { SettingsGamepadUiHandler } from "#ui/gamepad-settings-ui-handler";
@@ -108,6 +109,7 @@ const noTransitionModes = [
   UiMode.RUN_INFO,
   UiMode.CHANGE_PASSWORD_FORM,
   UiMode.ALERT_MODAL,
+  UiMode.FORGE_DRAFT,
 ];
 
 // biome-ignore lint/style/useNamingConvention: a unique case (only 2 letters)
@@ -183,6 +185,7 @@ export class UI extends Phaser.GameObjects.Container {
       new MysteryEncounterUiHandler(),
       new ChangePasswordFormUiHandler(),
       new AlertModalUiHandler(),
+      new ForgeDraftUiHandler(),
     ];
   }
 

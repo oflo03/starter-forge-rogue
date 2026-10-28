@@ -8,6 +8,7 @@ import {
   MYSTERY_ENCOUNTER_SPAWN_MAX_WEIGHT,
 } from "#app/constants";
 import { eventBus } from "#app/event-bus";
+import { forgeEnemyItemLimit, forgeLevelCap } from "#app/forge/balance";
 import type { GameMode } from "#app/game-mode";
 import { getGameMode } from "#app/game-mode";
 import { audioManager } from "#app/global-audio-manager";
@@ -2284,7 +2285,7 @@ export class BattleScene extends SceneBase {
 
   getMaxExpLevel(ignoreLevelCap = false): number {
     if (this.gameMode.isForge) {
-      return 60;
+      return forgeLevelCap(this.currentBattle?.waveIndex ?? 1);
     }
     const capOverride = activeOverrides.LEVEL_CAP_OVERRIDE ?? 0;
     if (capOverride > 0) {
@@ -2662,7 +2663,7 @@ export class BattleScene extends SceneBase {
       const difficultyWaveIndex = this.gameMode.getWaveForDifficulty(this.currentBattle.waveIndex);
       const isFinalBoss = this.gameMode.isWaveFinal(this.currentBattle.waveIndex);
       let chances = Math.ceil(difficultyWaveIndex / 10);
-      if (isFinalBoss) {
+      if (isFinalBoss && !this.gameMode.isForge) {
         chances = Math.ceil(chances * 2.5);
       }
 
@@ -2697,7 +2698,7 @@ export class BattleScene extends SceneBase {
           if (isBoss) {
             upgradeChance /= 2;
           }
-          if (isFinalBoss) {
+          if (isFinalBoss && !this.gameMode.isForge) {
             upgradeChance /= 8;
           }
           let count = 0;
@@ -2719,6 +2720,22 @@ export class BattleScene extends SceneBase {
         }
         return true;
       });
+      if (this.gameMode.isForge) {
+        const limit = forgeEnemyItemLimit(this.currentBattle.waveIndex);
+        const counts = new Map<number, number>();
+        this.enemyModifiers = this.enemyModifiers.filter(modifier => {
+          if (!(modifier instanceof PokemonHeldItemModifier)) {
+            return true;
+          }
+          const count = counts.get(modifier.pokemonId) ?? 0;
+          if (count >= limit) {
+            return false;
+          }
+          modifier.stackCount = 1;
+          counts.set(modifier.pokemonId, count + 1);
+          return true;
+        });
+      }
       this.updateModifiers(false);
       resolve();
     });
@@ -3319,6 +3336,9 @@ export class BattleScene extends SceneBase {
     useWaveIndexMultiplier = false,
     participantIds = this.currentBattle.playerParticipantIds,
   ): void {
+    if (this.gameMode.isForge && pokemonDefeated) {
+      expValue *= 2;
+    }
     // TODO: make this code actually not insane
     const party = this.getPlayerParty();
     const expShareModifier = this.findModifier(m => m instanceof ExpShareModifier) as ExpShareModifier;

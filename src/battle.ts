@@ -1,4 +1,5 @@
 import { DAILY_BOSS_LEVEL } from "#app/constants";
+import { forgeWildLevel } from "#app/forge/balance";
 import type { GameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import { settings } from "#app/global-settings-manager";
@@ -131,6 +132,9 @@ export class Battle {
   }
 
   public getLevelForWave(): number {
+    if (this.gameMode.isForge) {
+      return forgeWildLevel(this.waveIndex);
+    }
     if (isDailyFinalBoss(this.waveIndex)) {
       return DAILY_BOSS_LEVEL;
     }
