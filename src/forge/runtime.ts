@@ -119,6 +119,7 @@ export function configureForgePartner(pokemon: PlayerPokemon, seed: string, type
     types: [type as RegularPokemonType, null],
     forge: { seed, baseStats: evolutionStats(finalStats(seed), 1), stage: 1, events: [] },
   });
+  pokemon.moveset = starterMoves(type).map(id => new PokemonMove(id));
   pokemon.pauseEvolutions = true;
   pokemon.calculateStats();
   pokemon.hp = pokemon.getMaxHp();

@@ -7,12 +7,14 @@ import {
   starterAbility,
   starterMoves,
 } from "#app/forge/registry";
+import { configureForgePartner } from "#app/forge/runtime";
 import { AnimConfig, initMoveAnim, loadMoveAnimAssets, moveAnims } from "#data/battle-anims";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { AbilityId } from "#enums/ability-id";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
+import type { PlayerPokemon } from "#field/pokemon";
 import { describe, expect, it } from "vitest";
 import Catalog from "../../../forge/vendor/catalog.js";
 
@@ -165,5 +167,20 @@ describe("Forge original engine registry", () => {
         moveAnims.set(id, oldCustom);
       }
     }
+  });
+  it("replaces all backing-species moves when a new custom partner is configured", () => {
+    const pokemon = {
+      moveset: [1, 2, 3, 4],
+      calculateStats: () => {},
+      getMaxHp: () => 25,
+      hp: 1,
+    } as unknown as PlayerPokemon;
+    configureForgePartner(pokemon, "initial-moves-fixture", PokemonType.FIRE);
+    expect(pokemon.getMaxHp()).toBe(25);
+    expect(pokemon.hp).toBe(25);
+    expect(pokemon.moveset.map(move => move.moveId)).toEqual(starterMoves(PokemonType.FIRE));
+    expect(pokemon.customPokemonData.ability).toBe(AbilityId.BLAZE);
+    expect(pokemon.customPokemonData.forge?.baseStats.reduce((sum, n) => sum + n, 0)).toBe(310);
+    expect(pokemon.customPokemonData.forge?.events).toEqual([]);
   });
 });
