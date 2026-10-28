@@ -37,6 +37,7 @@ import { EnemyCommandPhase } from "#phases/enemy-command-phase";
 import { EvolutionPhase } from "#phases/evolution-phase";
 import { ExpPhase } from "#phases/exp-phase";
 import { FaintPhase } from "#phases/faint-phase";
+import { ForgeGrowthPhase } from "#phases/forge-growth-phase";
 import { FormChangePhase } from "#phases/form-change-phase";
 import { GameOverModifierRewardPhase } from "#phases/game-over-modifier-reward-phase";
 import { GameOverPhase } from "#phases/game-over-phase";
@@ -176,6 +177,7 @@ const PHASES = Object.freeze({
   MysteryEncounterRewardsPhase,
   PostMysteryEncounterPhase,
   NewBattlePhase,
+  ForgeGrowthPhase,
   NewBiomeEncounterPhase,
   NextEncounterPhase,
   ObtainStatusEffectPhase,

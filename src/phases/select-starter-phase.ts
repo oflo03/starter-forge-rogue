@@ -1,3 +1,4 @@
+import { configureForgePartner, meetForgePartner, randomForgeSeed } from "#app/forge/runtime";
 import { audioManager } from "#app/global-audio-manager";
 import { globalScene } from "#app/global-scene";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
@@ -14,10 +15,26 @@ import { applyChallenges } from "#utils/challenge-utils";
 
 export class SelectStarterPhase extends Phase {
   public readonly phaseName = "SelectStarterPhase";
-  start() {
+  private forgeEncounter?: { seed: string; type: import("#enums/pokemon-type").PokemonType };
+  async start() {
     super.start();
 
     audioManager.playBgm("menu");
+    if (globalScene.gameMode.isForge) {
+      globalScene.setSeed(randomForgeSeed());
+      const encounter = await meetForgePartner(0, 5, randomForgeSeed());
+      this.forgeEncounter = encounter;
+      globalScene.ui.setMode(UiMode.SAVE_SLOT, SaveSlotUiMode.SAVE, (slotId: number) => {
+        if (slotId < 0) {
+          globalScene.phaseManager.toTitleScreen();
+          this.end();
+          return;
+        }
+        globalScene.sessionSlotId = slotId;
+        this.initBattle([encounter.starter]);
+      });
+      return;
+    }
 
     globalScene.ui.setMode(UiMode.STARTER_SELECT, (starters: Starter[]) => {
       globalScene.ui.clearText();
@@ -71,8 +88,11 @@ export class SelectStarterPhase extends Phase {
         starter.ivs,
         starter.nature,
       );
+      if (this.forgeEncounter) {
+        configureForgePartner(starterPokemon, this.forgeEncounter.seed, this.forgeEncounter.type);
+      }
       if (starter.moveset) {
-        starterPokemon.tryPopulateMoveset(starter.moveset);
+        starterPokemon.tryPopulateMoveset(starter.moveset, !!this.forgeEncounter);
       }
       if (starter.passive) {
         starterPokemon.passive = true;

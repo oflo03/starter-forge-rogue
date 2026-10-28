@@ -153,7 +153,9 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
   }
 
   show(args: any[]): boolean {
-    globalScene.disableMenu = false;
+    globalScene.disableMenu =
+      Array.isArray(args[1])
+      && args[1].some((option: ModifierTypeOption) => option.type.id?.startsWith("forge-reward-"));
 
     if (this.active) {
       if (args.length >= 3) {
@@ -396,6 +398,12 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
   }
 
   processInput(button: Button): boolean {
+    if (
+      button === Button.CANCEL
+      && this.options.some(option => option.modifierTypeOption.type.id?.startsWith("forge-reward-"))
+    ) {
+      return false;
+    }
     const ui = this.getUi();
 
     if (!this.awaitingActionInput) {

@@ -1,0 +1,395 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+import { PLAYER_PARTY_MAX_SIZE } from "#app/constants";
+import { globalScene } from "#app/global-scene";
+import { speciesDataRegistry } from "#app/global-species-data-registry";
+import { initMoveAnim } from "#data/battle-anims";
+import { allMoves } from "#data/data-lists";
+import { getLevelTotalExp } from "#data/exp";
+import { CustomPokemonData } from "#data/pokemon-data";
+import { ModifierTier } from "#enums/modifier-tier";
+import { MoveCategory } from "#enums/move-category";
+import type { MoveId } from "#enums/move-id";
+import { Nature } from "#enums/nature";
+import type { PokemonType, RegularPokemonType } from "#enums/pokemon-type";
+import { SpeciesId } from "#enums/species-id";
+import { UiMode } from "#enums/ui-mode";
+import type { PlayerPokemon } from "#field/pokemon";
+import { ModifierType, ModifierTypeOption } from "#modifiers/modifier-type";
+import { PokemonMove } from "#moves/pokemon-move";
+import type { Starter } from "#types/save-data";
+import type { FormModalConfig, OptionSelectItem } from "#types/ui-types";
+import type { RenameFormUiHandler } from "#ui/rename-form-ui-handler";
+import { getPokemonTypeLocaleKey } from "#utils/i18n";
+import i18next from "i18next";
+import { evolutionStats } from "../../forge/stats.ts";
+import Maker from "../../forge/vendor/engine.js";
+import { customAbilityChoices, customMoveChoices, starterAbility, starterMoves } from "./registry";
+
+const milestones = [16, 26, 36, 46, 56];
+const types = Array.from({ length: 18 }, (_, i) => i as PokemonType);
+const statKeys = ["hp", "atk", "def", "spa", "spd", "spe"];
+const statNames = ["HP", "공격", "방어", "특공", "특방", "스피드"];
+export const randomForgeSeed = () =>
+  Array.from(crypto.getRandomValues(new Uint32Array(2)), n => n.toString(16).padStart(8, "0")).join("");
+const typeName = (type: PokemonType) => i18next.t(getPokemonTypeLocaleKey(type));
+const growthTypes = (pokemon: PlayerPokemon) =>
+  pokemon
+    .getTypes({ includeTeraType: false, bypassSummonData: true, ignoreThirdType: true })
+    .filter(type => types.includes(type));
+const finalStats = (seed: string): number[] => {
+  const stats = Maker.generateStats(seed).stats;
+  return statKeys.map(key => stats[key]);
+};
+const originalSpecies = (type: PokemonType, seed: string) => {
+  const pool = speciesDataRegistry
+    .getAllSpecies()
+    .filter(s => s.type1 === type && s.baseTotal <= 450 && !s.legendary && !s.mythical);
+  const values = pool.length > 0 ? pool : speciesDataRegistry.getAllSpecies().filter(s => s.type1 === type);
+  return (
+    values[Maker.createRng(seed + ":appearance").int(0, values.length - 1)]
+    ?? speciesDataRegistry.getSpecies(SpeciesId.EEVEE)
+  );
+};
+function nickname(): Promise<string> {
+  return new Promise(resolve => {
+    const open = (errorMessage?: string) => {
+      if (errorMessage && globalScene.ui.mode === UiMode.RENAME_POKEMON) {
+        const config: FormModalConfig = { errorMessage, buttonActions: [] };
+        (globalScene.ui.getHandler() as RenameFormUiHandler).updateContainer(config);
+        return;
+      }
+      return globalScene.ui.setModeWithoutClear(
+        UiMode.RENAME_POKEMON,
+        {
+          errorMessage,
+          buttonActions: [
+            (encoded: string) => {
+              const name = decodeURIComponent(escape(atob(encoded))).trim();
+              if (Array.from(name).length === 0 || Array.from(name).length > 12) {
+                open("이름은 1~12글자로 입력해 주세요.");
+                return;
+              }
+              globalScene.ui.setMode(UiMode.MESSAGE);
+              resolve(btoa(unescape(encodeURIComponent(name))));
+            },
+            () => open("파트너의 이름을 지어 주세요."),
+          ],
+        },
+        "",
+      );
+    };
+    open();
+  });
+}
+export async function meetForgePartner(
+  index: number,
+  level: number,
+  rootSeed: string,
+): Promise<{ starter: Starter; seed: string; type: PokemonType }> {
+  const seed = rootSeed + ":partner:" + index;
+  const random = Maker.createRng(seed);
+  const type = types[random.int(0, 17)];
+  const species = originalSpecies(type, seed);
+  await globalScene.ui.setMode(UiMode.MESSAGE);
+  await globalScene.ui.showTextPromise(
+    `새로운 파트너를 만났습니다!\n${typeName(type)} 타입 · Lv.${level}. 이름을 지어 주세요.`,
+  );
+  const name = await nickname();
+  return {
+    seed,
+    type,
+    starter: {
+      speciesId: species.speciesId,
+      shiny: false,
+      variant: 0,
+      formIndex: 0,
+      abilityIndex: 0,
+      passive: false,
+      nature: Nature.HARDY,
+      pokerus: false,
+      nickname: name,
+      ivs: statKeys.map(() => random.int(8, 20)),
+      moveset: starterMoves(type) as any,
+    },
+  };
+}
+export function configureForgePartner(pokemon: PlayerPokemon, seed: string, type: PokemonType): void {
+  pokemon.customPokemonData = new CustomPokemonData({
+    ability: starterAbility(type),
+    types: [type as RegularPokemonType, null],
+    forge: { seed, baseStats: evolutionStats(finalStats(seed), 1), stage: 1, events: [] },
+  });
+  pokemon.pauseEvolutions = true;
+  pokemon.calculateStats();
+  pokemon.hp = pokemon.getMaxHp();
+}
+export function forgeSeedText(): string {
+  if (!globalScene.gameMode?.isForge || !globalScene.getPlayerParty().some(p => p.customPokemonData.forge)) {
+    return "모험 시드는 모험 중 확인할 수 있습니다.";
+  }
+  const first = globalScene.getPlayerParty().find(p => p.customPokemonData.forge)!;
+  return `맵: ${globalScene.seed}\n파트너: ${first.customPokemonData.forge!.seed.split(":")[0]}`;
+}
+async function chooseList(title: string, options: { name: string; description?: string; value: any }[]): Promise<any> {
+  return new Promise(resolve => {
+    const ui = globalScene.ui;
+    const rows: OptionSelectItem[] = options.map(option => ({
+      label: option.name,
+      onHover: () => ui.showText(option.description || title, 0),
+      handler: () => {
+        ui.setMode(UiMode.MESSAGE);
+        resolve(option.value);
+        return true;
+      },
+    }));
+    ui.showText(
+      title,
+      0,
+      () => ui.setModeWithoutClear(UiMode.OPTION_SELECT, { options: rows, blockCancelButton: true, maxOptions: 6 }),
+      null,
+      true,
+    );
+  });
+}
+function rewardTier(seed: string): ModifierTier {
+  const n = Maker.createRng(globalScene.seed + ":reward:" + seed).int(1, 100);
+  return n <= 65 ? ModifierTier.COMMON : n <= 90 ? ModifierTier.GREAT : ModifierTier.ULTRA;
+}
+async function chooseCards(
+  title: string,
+  options: { name: string; description: string; value: any }[],
+  seed: string,
+): Promise<any> {
+  await globalScene.ui.setMode(UiMode.MESSAGE);
+  await globalScene.ui.showTextPromise(title);
+  const tier = rewardTier(seed.split(":tier:")[0]);
+  const items = options.map((option, i) => {
+    const item = new ModifierType("modifierType:RareCandyModifierType", "rare_candy", null);
+    item.id = "forge-reward-" + i;
+    item.setTier(tier);
+    Object.defineProperty(item, "name", { get: () => option.name });
+    item.getDescription = () => option.description;
+    return new ModifierTypeOption(item, 0);
+  });
+  return new Promise(resolve =>
+    globalScene.ui.setMode(
+      UiMode.MODIFIER_SELECT,
+      true,
+      items,
+      (row: number, index: number) => {
+        if (row !== 1 || index < 0 || index >= options.length) {
+          return false;
+        }
+        globalScene.ui.setMode(UiMode.MESSAGE).then(() => resolve(options[index].value));
+        return true;
+      },
+      -1,
+    ),
+  );
+}
+function enhancedCategory(pokemon: PlayerPokemon, stats: number[]): MoveCategory | undefined {
+  const choice = customAbilityChoices(growthTypes(pokemon), stats, "category").find(
+    o => o.id === pokemon.getAbility(true).id,
+  );
+  if (choice?.name === "밸런스기어") {
+    return pokemon.stats[1] <= pokemon.stats[3] ? MoveCategory.PHYSICAL : MoveCategory.SPECIAL;
+  }
+  return choice?.enhancedCategory;
+}
+export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number): Promise<void> {
+  const data = pokemon.customPokemonData.forge;
+  if (!data) {
+    return;
+  }
+  const priorMenuState = globalScene.disableMenu;
+  globalScene.disableMenu = true;
+  try {
+    const stats = finalStats(data.seed);
+    for (const level of milestones) {
+      if (level <= previousLevel || level > pokemon.level || data.events.includes(level)) {
+        continue;
+      }
+      if (level === 16 || level === 36) {
+        data.stage = level === 16 ? 2 : 3;
+        data.baseStats = evolutionStats(stats, data.stage);
+        pokemon.calculateStats();
+        await pokemon.updateInfo();
+      }
+      const rewardBase = data.seed + ":reward:" + level;
+      const rarity = rewardTier(rewardBase);
+      const seed = rewardBase + ":tier:" + rarity;
+      const name = pokemon.getNameToRender({ useIllusion: false });
+      if (level === 16 || level === 46) {
+        const options = customMoveChoices(
+          growthTypes(pokemon),
+          stats,
+          seed,
+          pokemon.getMoveset(true).map(m => m.moveId),
+        );
+        const id: MoveId = await chooseCards(
+          `${name} · ${level === 16 ? "첫 진화 · " : ""}Lv.${level}\n새로운 기술을 선택하세요.`,
+          options.map(o => ({ name: o.name, description: o.description, value: o.id })),
+          seed,
+        );
+        let slot = pokemon.getMoveset(true).length;
+        if (slot >= 4) {
+          const category = enhancedCategory(pokemon, stats);
+          // Original TMs can change a player's bundle; do not trap an already changed moveset.
+          const required =
+            category === undefined
+              ? 0
+              : Math.min(2, pokemon.getMoveset(true).filter(m => allMoves[m.moveId].category === category).length);
+          const replacements = pokemon
+            .getMoveset()
+            .map((m, i) => ({ m, i }))
+            .filter(
+              ({ i }) =>
+                category === undefined
+                || pokemon.getMoveset(true).filter((m, j) => allMoves[j === i ? id : m.moveId].category === category)
+                  .length >= required,
+            );
+          slot = await chooseList(
+            "교체할 기술을 선택하세요.",
+            replacements.map(({ m, i }) => ({
+              name: allMoves[m.moveId].name,
+              description: allMoves[m.moveId].effect,
+              value: i,
+            })),
+          );
+        }
+        await initMoveAnim(id);
+        pokemon.moveset[slot] = new PokemonMove(id);
+      } else if (level === 26) {
+        const options = customAbilityChoices(growthTypes(pokemon), stats, seed);
+        const choice = await chooseCards(
+          `${name} · 특성을 선택하세요.`,
+          options.map(o => ({
+            name: o.name,
+            description:
+              o.description + (o.enhancedCategory === undefined ? "" : "\n강화되는 연계 기술2개를 함께 배웁니다."),
+            value: o,
+          })),
+          seed,
+        );
+        pokemon.customPokemonData.ability = choice.id;
+        if (pokemon.isFusion()) {
+          pokemon.fusionCustomPokemonData ??= new CustomPokemonData();
+          pokemon.fusionCustomPokemonData.ability = choice.id;
+        }
+        const category = enhancedCategory(pokemon, stats);
+        if (category !== undefined) {
+          const distribution =
+            category === MoveCategory.PHYSICAL ? [100, 150, 100, 50, 100, 100] : [100, 50, 100, 150, 100, 100];
+          const linked = customMoveChoices(growthTypes(pokemon), distribution, seed + ":links")
+            .filter(m => m.category === category)
+            .slice(0, 2);
+          if (linked.length !== 2) {
+            throw new Error("연계 기술2개를 만들 수 없습니다.");
+          }
+          const kept = pokemon
+            .getMoveset()
+            .filter(m => !linked.some(l => l.id === m.moveId))
+            .slice(0, 2);
+          for (const move of linked) {
+            await initMoveAnim(move.id);
+          }
+          pokemon.moveset = kept.concat(linked.map(m => new PokemonMove(m.id)));
+        }
+      } else if (level === 36) {
+        const remaining = types.filter(t => !growthTypes(pokemon).includes(t));
+        const groups = [remaining.slice(0, 6), remaining.slice(6, 12), remaining.slice(12)];
+        const group: PokemonType[] = await chooseCards(
+          `${name} · 최종 진화\n두 번째 타입을 선택하세요.`,
+          groups.map((values, i) => ({
+            name: ["새로운 가능성", "다른 빛깔", "마지막 퍼즐"][i],
+            description: values.map(typeName).join(" · "),
+            value: values,
+          })),
+          seed,
+        );
+        const type: PokemonType = await chooseList(
+          "추가 타입",
+          group.map(t => ({ name: typeName(t), value: t })),
+        );
+        pokemon.customPokemonData.types = [pokemon.customPokemonData.types[0]!, type as RegularPokemonType];
+      } else {
+        const dominant = stats[1] >= stats[3] ? 1 : 3;
+        const selection = await chooseCards(
+          `${name} · 개체값 조정`,
+          [
+            { name: "고른 성장", description: "모든 개체값 +5. 최대31.", value: "all" },
+            { name: "주력의 완성", description: statNames[dominant] + " 개체값을31로 조정.", value: dominant },
+            { name: "한 가지에 집중", description: "원하는 능력치 하나의 개체값을31로 조정.", value: "focus" },
+          ],
+          seed,
+        );
+        if (selection === "all") {
+          pokemon.ivs = pokemon.ivs.map(n => Math.min(31, n + 5));
+        } else {
+          const stat =
+            selection === "focus"
+              ? await chooseList(
+                  "V로 만들 능력치",
+                  statNames.map((name, i) => ({ name, value: i })),
+                )
+              : selection;
+          pokemon.ivs[stat] = 31;
+        }
+      }
+      data.events.push(level);
+      pokemon.calculateStats();
+      await pokemon.updateInfo();
+    }
+  } finally {
+    globalScene.disableMenu = priorMenuState;
+  }
+}
+export async function recruitForgePartner(): Promise<void> {
+  const wave = globalScene.currentBattle.waveIndex;
+  if (!globalScene.gameMode.isForge || ![10, 20].includes(wave)) {
+    return;
+  }
+  const party = globalScene.getPlayerParty();
+  const partners = party.filter(p => p.customPokemonData.forge);
+  const index = wave === 10 ? 1 : 2;
+  if (partners.some(p => p.customPokemonData.forge!.seed.endsWith(":partner:" + index))) {
+    return;
+  }
+  const root = partners[0]?.customPokemonData.forge?.seed.split(":")[0] ?? globalScene.seed;
+  const encounter = await meetForgePartner(index, 10, root);
+  if (party.length >= PLAYER_PARTY_MAX_SIZE) {
+    const releaseOptions = party
+      .map((pokemon, index) => ({ pokemon, index }))
+      .filter(({ pokemon }) => !pokemon.customPokemonData.forge);
+    const index: number = await chooseList(
+      "탐험대가 가득 찼습니다. 새 파트너를 위해 작별할 포켓몬을 고르세요.",
+      releaseOptions.map(({ pokemon, index }) => ({
+        name: pokemon.getNameToRender({ useIllusion: false }),
+        description: "이 포켓몬과 소지 도구를 보내고 새 파트너를 맞이합니다.",
+        value: index,
+      })),
+    );
+    await globalScene.removePartyMemberModifiers(index);
+    const released = party.splice(index, 1)[0];
+    released.destroy();
+  }
+  const s = encounter.starter;
+  const pokemon = globalScene.addPlayerPokemon(
+    speciesDataRegistry.getSpecies(s.speciesId),
+    10,
+    s.abilityIndex,
+    s.formIndex,
+    undefined,
+    false,
+    0,
+    s.ivs,
+    s.nature,
+  );
+  pokemon.nickname = s.nickname!;
+  pokemon.tryPopulateMoveset(s.moveset!, true);
+  configureForgePartner(pokemon, encounter.seed, encounter.type);
+  pokemon.exp = getLevelTotalExp(10, pokemon.species.growthRate);
+  party.push(pokemon);
+  await pokemon.loadAssets();
+  await pokemon.updateInfo();
+}

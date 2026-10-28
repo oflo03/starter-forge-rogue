@@ -1,6 +1,7 @@
 import "#app/extensions"; // Setup Phaser extension methods/etc
 
 import { initAbilities } from "#abilities/init-abilities";
+import { initializeForgeRegistry } from "#app/forge/registry";
 import { initGlobalAudioManager } from "#app/global-audio-manager";
 import { initSettingsManager } from "#app/global-settings-manager";
 import { initChallenges } from "#data/challenge";
@@ -36,6 +37,7 @@ export async function initializeGame(): Promise<void> {
   initTrainerTypeDialogue();
   initMoves();
   initAbilities();
+  initializeForgeRegistry();
   initChallenges();
   initMysteryEncounters();
 }

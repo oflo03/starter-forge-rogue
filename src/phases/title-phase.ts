@@ -106,6 +106,13 @@ export class TitlePhase extends Phase {
           };
           const newGameOptions: OptionSelectItem[] = [];
           newGameOptions.push({
+            label: "Starter Forge · 60웨이브",
+            handler: () => {
+              setModeAndEnd(GameModes.FORGE);
+              return true;
+            },
+          });
+          newGameOptions.push({
             label: GameMode.getModeName(GameModes.CLASSIC),
             handler: () => {
               setModeAndEnd(GameModes.CLASSIC);
@@ -365,6 +372,13 @@ export class TitlePhase extends Phase {
       audioManager.playBgm();
     }
 
+    if (this.loaded && globalScene.gameMode.isForge) {
+      globalScene.getPlayerParty().forEach((pokemon, index) => {
+        if (pokemon.customPokemonData.forge) {
+          globalScene.phaseManager.pushNew("ForgeGrowthPhase", index, 0);
+        }
+      });
+    }
     globalScene.phaseManager.pushNew("EncounterPhase", this.loaded);
 
     if (this.loaded) {

@@ -16,6 +16,7 @@ import type { PokemonSpecies } from "#data/pokemon-species";
 import { BiomeId } from "#enums/biome-id";
 import { ChallengeType } from "#enums/challenge-type";
 import { Challenges } from "#enums/challenges";
+import { ClassicFixedBossWaves } from "#enums/fixed-boss-waves";
 import { GameModes } from "#enums/game-modes";
 import { SpeciesId } from "#enums/species-id";
 import { classicFixedBattles, type FixedBattleConfigs } from "#trainers/fixed-battle-configs";
@@ -25,6 +26,7 @@ import { BooleanHolder, randSeedInt, randSeedItem } from "#utils/common";
 import i18next from "i18next";
 
 interface GameModeConfig {
+  isForge?: boolean;
   isClassic?: boolean;
   isEndless?: boolean;
   isDaily?: boolean;
@@ -39,6 +41,7 @@ interface GameModeConfig {
 }
 
 export class GameMode implements GameModeConfig {
+  public isForge = false;
   public modeId: GameModes;
   public isClassic: boolean;
   public isEndless: boolean;
@@ -204,6 +207,9 @@ export class GameMode implements GameModeConfig {
    * @returns Whether a trainer should be generated
    */
   public isWaveTrainer(waveIndex: number): boolean {
+    if (this.isForge) {
+      return this.isFixedBattle(waveIndex);
+    }
     const { arena, offsetGym } = globalScene;
 
     // Daily spawns trainers on floors 5, 15, 20, 25, 30, 35, 40, and 45
@@ -254,6 +260,9 @@ export class GameMode implements GameModeConfig {
   }
 
   isTrainerBoss(waveIndex: number, biomeType: BiomeId, offsetGym: boolean): boolean {
+    if (this.isForge) {
+      return waveIndex === 40 || waveIndex === 60;
+    }
     switch (this.modeId) {
       case GameModes.DAILY:
         return waveIndex > 10 && waveIndex < 50 && !(waveIndex % 10);
@@ -266,6 +275,9 @@ export class GameMode implements GameModeConfig {
   }
 
   getOverrideSpecies(waveIndex: number): PokemonSpecies | null {
+    if (this.isForge) {
+      return null;
+    }
     if (this.isDaily && this.isWaveFinal(waveIndex)) {
       const eventBoss = getDailyEventSeedBoss();
       if (eventBoss?.speciesId != null) {
@@ -295,6 +307,8 @@ export class GameMode implements GameModeConfig {
    */
   isWaveFinal(waveIndex: number, modeId: GameModes = this.modeId): boolean {
     switch (modeId) {
+      case GameModes.FORGE:
+        return waveIndex === 60;
       case GameModes.CLASSIC:
       case GameModes.CHALLENGE:
         return waveIndex === 200;
@@ -311,6 +325,9 @@ export class GameMode implements GameModeConfig {
    * @returns true if waveIndex is a multiple of 10
    */
   isBoss(waveIndex: number): boolean {
+    if (this.isForge) {
+      return waveIndex === 40 || waveIndex === 60;
+    }
     return waveIndex % 10 === 0;
   }
 
@@ -399,6 +416,7 @@ export class GameMode implements GameModeConfig {
 
   getEnemyModifierChance(isBoss: boolean): number {
     switch (this.modeId) {
+      case GameModes.FORGE:
       case GameModes.CLASSIC:
       case GameModes.CHALLENGE:
       case GameModes.DAILY:
@@ -411,6 +429,8 @@ export class GameMode implements GameModeConfig {
 
   getName(): string {
     switch (this.modeId) {
+      case GameModes.FORGE:
+        return "Starter Forge";
       case GameModes.CLASSIC:
         return i18next.t("gameMode:classic");
       case GameModes.ENDLESS:
@@ -452,6 +472,8 @@ export class GameMode implements GameModeConfig {
 
   static getModeName(modeId: GameModes): string {
     switch (modeId) {
+      case GameModes.FORGE:
+        return "Starter Forge";
       case GameModes.CLASSIC:
         return i18next.t("gameMode:classic");
       case GameModes.ENDLESS:
@@ -468,6 +490,18 @@ export class GameMode implements GameModeConfig {
 
 export function getGameMode(gameMode: GameModes): GameMode {
   switch (gameMode) {
+    case GameModes.FORGE:
+      return new GameMode(
+        GameModes.FORGE,
+        { isForge: true, hasTrainers: true, hasMysteryEncounters: false },
+        {
+          5: classicFixedBattles[ClassicFixedBossWaves.RIVAL_1],
+          25: classicFixedBattles[ClassicFixedBossWaves.RIVAL_3],
+          40: classicFixedBattles[ClassicFixedBossWaves.EVIL_BOSS_1],
+          55: classicFixedBattles[ClassicFixedBossWaves.RIVAL_4],
+          60: classicFixedBattles[ClassicFixedBossWaves.CHAMPION],
+        },
+      );
     case GameModes.CLASSIC:
       return new GameMode(
         GameModes.CLASSIC,

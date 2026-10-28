@@ -434,6 +434,12 @@ export async function initCommonAnims(): Promise<void> {
 }
 
 export function initMoveAnim(move: MoveId): Promise<void> {
+  const alias = (allMoves[move] as (typeof allMoves)[number] & { forgeAnimation?: MoveId }).forgeAnimation;
+  if (alias !== undefined) {
+    return initMoveAnim(alias).then(() => {
+      moveAnims.set(move, moveAnims.get(alias)!);
+    });
+  }
   return new Promise(resolve => {
     if (moveAnims.has(move)) {
       if (moveAnims.get(move) === null) {

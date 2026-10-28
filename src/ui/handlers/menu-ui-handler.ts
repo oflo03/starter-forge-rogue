@@ -482,7 +482,7 @@ export class MenuUiHandler extends OptionSelectUiHandler {
         keepOpen: true,
       },
     ];
-    if (bypassLogin || loggedInUser?.hasAdminRole) {
+    if ((isDev && bypassLogin) || loggedInUser?.hasAdminRole) {
       communityOptions.push({
         label: "Admin",
         handler: () => {

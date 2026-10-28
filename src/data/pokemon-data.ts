@@ -20,6 +20,44 @@ import type { SerializedSpeciesForm } from "#types/pokemon-common";
 import type { TurnMove } from "#types/turn-move";
 import type { CoerceNullPropertiesToUndefined } from "#types/type-helpers";
 
+/** Seeded growth data belonging to one Forge Pokemon, never its backing species. */
+export interface ForgePokemonData {
+  seed: string;
+  /** Current base stats in HP, Attack, Defense, Sp. Atk, Sp. Def, Speed order. */
+  baseStats: number[];
+  stage: 1 | 2 | 3;
+  events: number[];
+  name?: string;
+}
+
+/** Discard malformed saved Forge data rather than passing invalid stats to battle calculations. */
+function copyForgePokemonData(data: unknown): ForgePokemonData | undefined {
+  if (typeof data !== "object" || data === null) {
+    return undefined;
+  }
+  const candidate = data as Partial<ForgePokemonData>;
+  if (
+    typeof candidate.seed !== "string"
+    || candidate.seed.length === 0
+    || !Array.isArray(candidate.baseStats)
+    || candidate.baseStats.length !== 6
+    || !candidate.baseStats.every(value => Number.isInteger(value) && value >= 1 && value <= 255)
+    || ![1, 2, 3].includes(candidate.stage ?? 0)
+    || !Array.isArray(candidate.events)
+    || !candidate.events.every(value => [16, 26, 36, 46, 56].includes(value))
+    || (candidate.name !== undefined && typeof candidate.name !== "string")
+  ) {
+    return undefined;
+  }
+  return {
+    seed: candidate.seed,
+    baseStats: [...candidate.baseStats],
+    stage: candidate.stage as ForgePokemonData["stage"],
+    events: [...new Set(candidate.events)],
+    ...(candidate.name === undefined ? {} : { name: candidate.name }),
+  };
+}
+
 /**
  * Permanent data that can customize a Pokemon in non-standard ways from its Species.
  * Includes abilities, nature, changed types, etc.
@@ -32,6 +70,7 @@ export class CustomPokemonData {
   public passive: AbilityId | -1;
   public nature: Nature | -1;
   public types: (RegularPokemonType | null)[];
+  public forge?: ForgePokemonData | undefined;
 
   constructor(data?: CustomPokemonData | Partial<CustomPokemonData>) {
     this.spriteScale = data?.spriteScale ?? -1;
@@ -39,6 +78,7 @@ export class CustomPokemonData {
     this.passive = data?.passive ?? -1;
     this.nature = data?.nature ?? -1;
     this.types = data?.types ?? [];
+    this.forge = copyForgePokemonData(data?.forge);
   }
 }
 

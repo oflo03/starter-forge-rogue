@@ -80,6 +80,11 @@ export class LevelUpPhase extends PlayerPartyMemberPokemonPhase {
   }
 
   public override end(): void {
+    if (this.pokemon.customPokemonData.forge) {
+      globalScene.phaseManager.unshiftNew("ForgeGrowthPhase", this.partyMemberIndex, this.lastLevel);
+      super.end();
+      return;
+    }
     // this if check feels like an unnecessary optimization
     if (this.lastLevel < 100) {
       const levelMoves = this.getPokemon().getLevelMoves({

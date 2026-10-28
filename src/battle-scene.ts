@@ -2283,6 +2283,9 @@ export class BattleScene extends SceneBase {
   }
 
   getMaxExpLevel(ignoreLevelCap = false): number {
+    if (this.gameMode.isForge) {
+      return 60;
+    }
     const capOverride = activeOverrides.LEVEL_CAP_OVERRIDE ?? 0;
     if (capOverride > 0) {
       return capOverride;

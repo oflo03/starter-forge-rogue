@@ -1162,6 +1162,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   getSpriteScale(): number {
+    // Keep the custom Pokemon's image slot empty until its artwork is supplied.
+    if (this.customPokemonData.forge && this.customPokemonData.spriteScale === 0) {
+      return 0;
+    }
     const formKey = this.getFormKey();
     if (
       this.isMax() === true
@@ -1623,14 +1627,16 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   calculateBaseStats(): number[] {
-    const baseStats = this.getSpeciesForm(true).baseStats.slice(0);
+    const baseStats = (this.customPokemonData.forge?.baseStats ?? this.getSpeciesForm(true).baseStats).slice(0);
     applyChallenges(ChallengeType.FLIP_STAT, this, baseStats);
     // Shuckle Juice
     globalScene.applyModifiers(PokemonBaseStatTotalModifier, this.isPlayer(), this, baseStats);
     // Old Gateau
     globalScene.applyModifiers(PokemonBaseStatFlatModifier, this.isPlayer(), this, baseStats);
     if (this.isFusion()) {
-      const fusionBaseStats = this.getFusionSpeciesForm(true).baseStats.slice(0);
+      const fusionBaseStats = (
+        this.fusionCustomPokemonData?.forge?.baseStats ?? this.getFusionSpeciesForm(true).baseStats
+      ).slice(0);
       applyChallenges(ChallengeType.FLIP_STAT, this, fusionBaseStats);
 
       for (const s of PERMANENT_STATS) {
@@ -2139,7 +2145,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     const customTypes = this.customPokemonData.types;
 
     const firstType = customTypes[0] ?? speciesForm.type1;
-    const secondCustomType = customTypes[1] ?? speciesForm.type2;
+    // Forge's explicit null removes the backing species' secondary type.
+    // Existing non-Forge custom data retains its original fallback semantics.
+    const secondCustomType =
+      this.customPokemonData.forge && customTypes.length > 1 && customTypes[1] === null
+        ? null
+        : (customTypes[1] ?? speciesForm.type2);
 
     // Second type
     let secondType: PokemonType | null = secondCustomType;
@@ -2149,7 +2160,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       const fusionCustomTypes = this.fusionCustomPokemonData?.types ?? [];
 
       const fusionType1 = fusionCustomTypes[0] ?? fusionSpeciesForm.type1;
-      const fusionType2 = fusionCustomTypes[1] ?? fusionSpeciesForm.type2;
+      const fusionType2 =
+        this.fusionCustomPokemonData?.forge && fusionCustomTypes.length > 1 && fusionCustomTypes[1] === null
+          ? null
+          : (fusionCustomTypes[1] ?? fusionSpeciesForm.type2);
 
       // Assign second type if the fusion can provide one
       if (fusionType2 !== null && fusionType2 !== firstType) {

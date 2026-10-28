@@ -1,4 +1,5 @@
 import { eventBus } from "#app/event-bus";
+import { forgeSeedText } from "#app/forge/runtime";
 import { globalScene } from "#app/global-scene";
 import type { GeneralSettingsKey, SettingsUiItem } from "#types/settings";
 import { BaseSettingsUiHandler } from "#ui/base-settings-ui-handler";
@@ -19,6 +20,9 @@ export class GeneralSettingsUiHandler extends BaseSettingsUiHandler {
     const ret = super.show(args);
 
     this.updateMoveTouchControlsSettingsLabel();
+    if (globalScene.gameMode?.isForge) {
+      this.showText(forgeSeedText(), 0);
+    }
 
     return ret;
   }

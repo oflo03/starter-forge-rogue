@@ -81,6 +81,11 @@ export default defineConfig(async config => {
   return {
     ...(await sharedConfig(config)),
     base: "",
+    // This fork runs locally saved, offline adventures; it never uses upstream accounts.
+    define: {
+      "import.meta.env.VITE_BYPASS_LOGIN": JSON.stringify("1"),
+      "import.meta.env.VITE_GITHUB_URL": JSON.stringify("https://github.com/oflo03/starter-forge-rogue"),
+    },
     publicDir: command === "serve" ? "assets" : false,
     server: {
       port: Number.isNaN(envPort) ? 8000 : envPort,
