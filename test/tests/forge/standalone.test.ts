@@ -50,6 +50,28 @@ describe("Forge standalone experience", () => {
     expect(mode.getFixedBattle(5)).toBe(classicFixedBattles[ClassicFixedBossWaves.RIVAL_1]);
   });
 
+  it("offers three distinct reproducible partner types for each random encounter seed", () => {
+    const seen = new Set<number>();
+    for (let i = 0; i < 100; i++) {
+      const seed = `encounter-${i}`;
+      const choices = forgeRuntime.forgePartnerTypeChoices(seed);
+      expect(choices).toHaveLength(3);
+      expect(new Set(choices).size).toBe(3);
+      expect(choices).toEqual(forgeRuntime.forgePartnerTypeChoices(seed));
+      choices.forEach(type => seen.add(type));
+    }
+    expect(seen.size).toBe(18);
+  });
+
+  it("does not recruit a third partner after wave 20", async () => {
+    game.scene.currentBattle.waveIndex = 20;
+    const before = game.scene.getPlayerParty().length;
+    const mode = vi.spyOn(game.scene.ui, "setMode").mockResolvedValue();
+    await forgeRuntime.recruitForgePartner();
+    expect(game.scene.getPlayerParty()).toHaveLength(before);
+    expect(mode).not.toHaveBeenCalled();
+  });
+
   it("grants the original starting money when the Forge save slot is confirmed", async () => {
     const encounter = {
       seed: "money-fixture",

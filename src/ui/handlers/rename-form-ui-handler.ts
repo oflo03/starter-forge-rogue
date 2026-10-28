@@ -1,10 +1,34 @@
+import { globalScene } from "#app/global-scene";
 import type { PlayerPokemon } from "#field/pokemon";
-import type { ModalConfig } from "#types/ui-types";
+import type { FormModalConfig, ModalConfig } from "#types/ui-types";
 import type { InputFieldConfig } from "#ui/form-modal-ui-handler";
 import { FormModalUiHandler } from "#ui/form-modal-ui-handler";
 import i18next from "i18next";
 
 export class RenameFormUiHandler extends FormModalUiHandler {
+  private partnerPreview: Phaser.GameObjects.Image | undefined;
+
+  override getHeight(config?: FormModalConfig): number {
+    return super.getHeight(config) + (config?.previewTexture ? 76 : 0);
+  }
+
+  override updateContainer(config?: FormModalConfig): void {
+    super.updateContainer(config);
+    const offset = config?.previewTexture ? 76 : 0;
+    this.inputContainers[0]?.setY(28 + offset);
+    this.formLabels[0]?.setY(31 + offset);
+    this.errorMessage.setY(47 + offset + this.getButtonTopMargin());
+    this.partnerPreview?.destroy();
+    this.partnerPreview = undefined;
+    if (config?.previewTexture) {
+      this.partnerPreview = globalScene.add
+        .image(80, 94, config.previewTexture)
+        .setOrigin(0.5, 1)
+        .setCrop(0, 28, 96, 68);
+      this.modalContainer.add(this.partnerPreview);
+    }
+  }
+
   getModalTitle(_config?: ModalConfig): string {
     return i18next.t("menu:renamePokemon");
   }
@@ -13,8 +37,8 @@ export class RenameFormUiHandler extends FormModalUiHandler {
     return 160;
   }
 
-  getMargin(_config?: ModalConfig): [number, number, number, number] {
-    return [0, 0, 48, 0];
+  getMargin(config?: FormModalConfig): [number, number, number, number] {
+    return [0, 0, config?.previewTexture ? 0 : 48, 0];
   }
 
   getButtonLabels(_config?: ModalConfig): string[] {

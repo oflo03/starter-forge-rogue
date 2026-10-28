@@ -25,6 +25,7 @@ import { getPokemonTypeLocaleKey } from "#utils/i18n";
 import i18next from "i18next";
 import { evolutionStats } from "../../forge/stats.ts";
 import Maker from "../../forge/vendor/engine.js";
+import { forgeAppearance } from "./appearance";
 import { customAbilityChoices, customMoveChoices, starterAbility, starterMoves } from "./registry";
 
 const milestones = [16, 26, 36, 46, 56];
@@ -52,11 +53,16 @@ const originalSpecies = (type: PokemonType, seed: string) => {
     ?? speciesDataRegistry.getSpecies(SpeciesId.EEVEE)
   );
 };
-function nickname(): Promise<string> {
+function nickname(previewTexture?: string): Promise<string> {
+  globalScene.ui.clearText();
   return new Promise(resolve => {
     const open = (errorMessage?: string) => {
       if (errorMessage && globalScene.ui.mode === UiMode.RENAME_POKEMON) {
-        const config: FormModalConfig = { errorMessage, buttonActions: [] };
+        const config: FormModalConfig = {
+          errorMessage,
+          ...(previewTexture ? { previewTexture } : {}),
+          buttonActions: [],
+        };
         (globalScene.ui.getHandler() as RenameFormUiHandler).updateContainer(config);
         return;
       }
@@ -64,6 +70,7 @@ function nickname(): Promise<string> {
         UiMode.RENAME_POKEMON,
         {
           errorMessage,
+          ...(previewTexture ? { previewTexture } : {}),
           buttonActions: [
             (encoded: string) => {
               const name = decodeURIComponent(escape(atob(encoded))).trim();
@@ -83,6 +90,11 @@ function nickname(): Promise<string> {
     open();
   });
 }
+export function forgePartnerTypeChoices(seed: string): PokemonType[] {
+  const random = Maker.createRng(seed);
+  const pool = [...types];
+  return Array.from({ length: 3 }, () => pool.splice(random.int(0, pool.length - 1), 1)[0]);
+}
 export async function meetForgePartner(
   index: number,
   level: number,
@@ -90,13 +102,26 @@ export async function meetForgePartner(
 ): Promise<{ starter: Starter; seed: string; type: PokemonType }> {
   const seed = rootSeed + ":partner:" + index;
   const random = Maker.createRng(seed);
-  const type = types[random.int(0, 17)];
+  const candidates = forgePartnerTypeChoices(seed);
+  const body = forgeBodyForSeed(seed);
+  const previousMenuState = globalScene.disableMenu;
+  const type: PokemonType = await chooseCards(
+    "함께 모험할 파트너의 타입을 고르세요.",
+    candidates.map(type => ({
+      name: typeName(type),
+      description: `${typeName(type)} 타입 · Lv.${level}\n이 타입의 파트너와 함께합니다. 선택 후 모습을 보고 이름을 지어 주세요.`,
+      value: type,
+      previewTexture: forgeAppearance([type], false, 1, body),
+    })),
+    seed,
+  );
+  globalScene.disableMenu = previousMenuState;
   const species = originalSpecies(type, seed);
   await globalScene.ui.setMode(UiMode.MESSAGE);
   await globalScene.ui.showTextPromise(
     `새로운 파트너를 만났습니다!\n${typeName(type)} 타입 · Lv.${level}. 이름을 지어 주세요.`,
   );
-  const name = await nickname();
+  const name = await nickname(forgeAppearance([type], false, 1, body));
   return {
     seed,
     type,
@@ -160,7 +185,7 @@ function rewardTier(seed: string): ModifierTier {
 }
 async function chooseCards(
   title: string,
-  options: { name: string; description: string; value: any; moveId?: MoveId }[],
+  options: { name: string; description: string; value: any; moveId?: MoveId; previewTexture?: string }[],
   seed: string,
 ): Promise<any> {
   await globalScene.ui.setMode(UiMode.MESSAGE);
@@ -172,6 +197,9 @@ async function chooseCards(
         ? new ModifierType("modifierType:RareCandyModifierType", "rare_candy", null)
         : new TmModifierType(option.moveId);
     item.id = "forge-reward-" + i;
+    if (option.previewTexture) {
+      item.previewTexture = option.previewTexture;
+    }
     item.setTier(tier);
     Object.defineProperty(item, "name", { get: () => option.name });
     item.getDescription = () => option.description;
@@ -185,6 +213,9 @@ async function chooseCards(
         items,
         (row: number, index: number) => {
           if (row === 0 && index === 2) {
+            if (globalScene.getPlayerParty().length === 0) {
+              return false;
+            }
             globalScene.ui.setModeWithoutClear(UiMode.PARTY, PartyUiMode.CHECK, -1, show);
             return true;
           }
@@ -385,12 +416,12 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
 }
 export async function recruitForgePartner(): Promise<void> {
   const wave = globalScene.currentBattle.waveIndex;
-  if (!globalScene.gameMode.isForge || ![10, 20].includes(wave)) {
+  if (!globalScene.gameMode.isForge || wave !== 10) {
     return;
   }
   const party = globalScene.getPlayerParty();
   const partners = party.filter(p => p.customPokemonData.forge);
-  const index = wave === 10 ? 1 : 2;
+  const index = 1;
   if (partners.some(p => p.customPokemonData.forge!.seed.endsWith(":partner:" + index))) {
     return;
   }

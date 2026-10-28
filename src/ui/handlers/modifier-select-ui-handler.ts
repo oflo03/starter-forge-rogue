@@ -211,8 +211,8 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
     this.updateRerollCostText();
 
     const typeOptions = args[1] as ModifierTypeOption[];
-    const hasShop = globalScene.gameMode.getShopStatus();
-    const baseShopCost = new NumberHolder(globalScene.getWaveMoneyAmount(1));
+    const hasShop = !!globalScene.currentBattle && globalScene.gameMode.getShopStatus();
+    const baseShopCost = new NumberHolder(globalScene.currentBattle ? globalScene.getWaveMoneyAmount(1) : 0);
     globalScene.applyModifier(HealShopCostModifier, true, baseShopCost);
     const shopTypeOptions = hasShop
       ? getPlayerShopModifierTypeOptionsForWave(globalScene.currentBattle.waveIndex, baseShopCost.value)
@@ -267,9 +267,11 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
     globalScene.getModifierBar().updateModifiers(globalScene.modifiers, true);
 
     globalScene.showShopOverlay(fixedInt(750));
-    globalScene.updateAndShowText(750);
-    globalScene.updateBiomeWaveText();
-    globalScene.updateMoneyText();
+    if (globalScene.currentBattle) {
+      globalScene.updateAndShowText(750);
+      globalScene.updateBiomeWaveText();
+      globalScene.updateMoneyText();
+    }
 
     // DO NOT REMOVE: Fixes bug which allows action input to be processed before the UI is shown,
     // causing errors if reroll is selected
@@ -347,7 +349,7 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
         this.lockRarityButtonContainer.setAlpha(0);
         this.continueButtonContainer.setAlpha(0);
         this.rerollButtonContainer.setVisible(true);
-        this.checkButtonContainer.setVisible(true);
+        this.checkButtonContainer.setVisible(globalScene.getPlayerParty().length > 0);
         this.continueButtonContainer.setVisible(this.rerollCost < 0);
         this.lockRarityButtonContainer.setVisible(canLockRarities);
 
@@ -609,7 +611,7 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
           const nameWithCost = `${type.name}\u00A0\u00A0\u00A0@[${costStyleName}]{${costText}}`;
           messageHandler.showNameText(getTextWithColors(nameWithCost, TextStyle.MESSAGE, true), type.iconImage);
         } else {
-          messageHandler.showNameText(type.name, type.iconImage);
+          messageHandler.showNameText(type.name, type.previewTexture ? undefined : type.iconImage);
         }
 
         if (type instanceof TmModifierType) {
@@ -621,7 +623,11 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
           }
         } else if (type.id?.startsWith("forge-reward-")) {
           this.forgeRewardInfoOverlay.showDescription(type.getDescription());
-          ui.showText("위 설명을 확인하고 선택하세요.\n파티 확인에서 현재 기술과 특성을 볼 수 있습니다.");
+          ui.showText(
+            type.previewTexture
+              ? "타입을 고른 뒤 이름을 지어 주세요."
+              : "위 설명을 확인하고 선택하세요.\n파티 확인에서 현재 기술과 특성을 볼 수 있습니다.",
+          );
         }
       }
     } else if (cursor === 0) {
@@ -846,6 +852,9 @@ class ModifierOption extends Phaser.GameObjects.Container {
     this.add(this.itemContainer);
 
     const getItem = () => {
+      if (this.modifierTypeOption.type?.previewTexture) {
+        return globalScene.add.sprite(0, 0, this.modifierTypeOption.type.previewTexture);
+      }
       const item = globalScene.add.sprite(0, 0, "items", this.modifierTypeOption.type?.iconImage);
       return item;
     };

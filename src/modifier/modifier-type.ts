@@ -138,6 +138,8 @@ export class ModifierType {
   public id: string;
   public localeKey: string;
   public iconImage: string;
+  /** Optional standalone texture used by Forge partner encounter cards. */
+  public previewTexture?: string;
   public group: string;
   public soundName: string;
   public tier: ModifierTier;

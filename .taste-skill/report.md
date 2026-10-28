@@ -17,3 +17,7 @@ User replaced the procedural circle direction with original PokeRogue type image
 
 ## 2026-10-28: universal partner pixel sprites
 Replaced temporary type badges with 36 original neutral pixel frames: six body families, three evolution stages, true front/back views. Rejected agile/heavy/armored designs were regenerated as cacomistle/takin/armadillo; armored anatomy has four mammal legs. Original native UI remains. Canonical 8-color palettes use permanent type metadata and preserve alpha; body identity persists in saves. Native browser verified 180 body/stage/view/type combinations, battle back sprites, party/summary fronts, all growth rewards and save reconstruction. 18 focused tests cover exact asset count, size, role coverage, palette geometry and saved body identity.
+
+
+## Partner encounter selection
+First and wave-10 encounters reuse native reward selection: three distinct seeded type candidates, selected creature preview during naming, identical permanent type/body through battle. Wave-20 third recruitment removed. Native desktop/mobile flow checks selected second candidate, nickname validation, starting money and battle turn 2; dedicated recruitment check chooses third candidate for partner two and proves no wave-20 recruitment.

@@ -20,6 +20,7 @@ export interface ModalConfig {
 
 export interface FormModalConfig extends ModalConfig {
   errorMessage?: string;
+  previewTexture?: string;
 }
 
 export type SaveSlotSelectCallback = (cursor: number) => void;
