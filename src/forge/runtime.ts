@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { PLAYER_PARTY_MAX_SIZE } from "#app/constants";
+import { forgeBodyForSeed } from "#app/forge/body";
 import { globalScene } from "#app/global-scene";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { initMoveAnim } from "#data/battle-anims";
@@ -118,7 +119,7 @@ export function configureForgePartner(pokemon: PlayerPokemon, seed: string, type
   pokemon.customPokemonData = new CustomPokemonData({
     ability: starterAbility(type),
     types: [type as RegularPokemonType, null],
-    forge: { seed, baseStats: evolutionStats(finalStats(seed), 1), stage: 1, events: [] },
+    forge: { seed, baseStats: evolutionStats(finalStats(seed), 1), stage: 1, events: [], body: forgeBodyForSeed(seed) },
   });
   pokemon.moveset = starterMoves(type).map(id => new PokemonMove(id));
   pokemon.pauseEvolutions = true;

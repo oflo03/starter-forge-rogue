@@ -1,13 +1,22 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { globalScene } from "#app/global-scene";
 import { PokemonType } from "#enums/pokemon-type";
+import type { ForgeBody } from "./body";
+import { recolorForgePixels } from "./palette";
 
-export function forgeAppearance(types: readonly (PokemonType | null)[], icon = false, stage: 1 | 2 | 3 = 1): string {
+export function forgeAppearance(
+  types: readonly (PokemonType | null)[],
+  icon = false,
+  stage: 1 | 2 | 3 = 1,
+  body: ForgeBody = "standard",
+  back = false,
+): string {
   const values = types.filter((type): type is PokemonType => type !== null && type >= 0 && type < 18).slice(0, 2);
   if (values.length === 0) {
     values.push(PokemonType.NORMAL);
   }
-  const key = `forge-partner-${values.join("-")}-stage${stage}${icon ? "-icon" : ""}`;
+  const view = back && !icon ? "back" : "front";
+  const key = `forge-partner-${body}-${view}-${values.join("-")}-stage${stage}${icon ? "-icon" : ""}`;
   if (globalScene.textures.exists(key)) {
     return key;
   }
@@ -15,31 +24,19 @@ export function forgeAppearance(types: readonly (PokemonType | null)[], icon = f
   const texture = globalScene.textures.createCanvas(key, size, size)!;
   const context = texture.getContext();
   context.imageSmoothingEnabled = false;
-  values.forEach((type, index) => {
-    const frame = globalScene.textures.getFrame("pbinfo_player_type", PokemonType[type].toLowerCase());
-    const scale = icon ? 1 : 3;
-    const width = frame.cutWidth * scale;
-    const height = frame.cutHeight * scale;
-    context.save();
-    if (values.length === 2) {
-      // Clip full-sized badges so each contributes exactly one half, without squeezing either image.
-      context.beginPath();
-      context.rect((index * size) / 2, 0, size / 2, size);
-      context.clip();
+  if (icon) {
+    const fieldKey = forgeAppearance(values, false, stage, body, false);
+    context.drawImage(globalScene.textures.get(fieldKey).getSourceImage() as HTMLCanvasElement, 0, 0, size, size);
+  } else {
+    const sourceKey = `forge-base-${body}-stage${stage}-${view}`;
+    if (!globalScene.textures.exists(sourceKey)) {
+      throw new Error("Missing Forge base sprite: " + sourceKey);
     }
-    context.drawImage(
-      frame.source.image as HTMLImageElement,
-      frame.cutX,
-      frame.cutY,
-      frame.cutWidth,
-      frame.cutHeight,
-      Math.floor((size - width) / 2),
-      Math.floor((size - height) / 2),
-      width,
-      height,
-    );
-    context.restore();
-  });
+    context.drawImage(globalScene.textures.get(sourceKey).getSourceImage() as HTMLImageElement, 0, 0);
+    const pixels = context.getImageData(0, 0, size, size);
+    recolorForgePixels(pixels.data, values);
+    context.putImageData(pixels, 0, 0);
+  }
   // Pixel digits stay readable at party-icon size without depending on canvas fonts.
   const digits = [
     [],

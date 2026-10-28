@@ -6,6 +6,7 @@ import type { Battle } from "#app/battle";
 import type { BattleScene } from "#app/battle-scene";
 import { PLAYER_PARTY_MAX_SIZE, RARE_CANDY_FRIENDSHIP_CAP } from "#app/constants";
 import { forgeAppearance } from "#app/forge/appearance";
+import { forgeBodyForSeed } from "#app/forge/body";
 import { audioManager } from "#app/global-audio-manager";
 import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
@@ -778,8 +779,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    */
   async loadAssets(ignoreOverride = true, useIllusion = false): Promise<void> {
     if (this.customPokemonData.forge) {
-      forgeAppearance(this.customPokemonData.types, false, this.customPokemonData.forge.stage);
-      forgeAppearance(this.customPokemonData.types, true, this.customPokemonData.forge.stage);
+      const data = this.customPokemonData.forge;
+      data.body ??= forgeBodyForSeed(data.seed);
+      forgeAppearance(this.customPokemonData.types, false, data.stage, data.body, false);
+      forgeAppearance(this.customPokemonData.types, false, data.stage, data.body, true);
+      forgeAppearance(this.customPokemonData.types, true, data.stage, data.body, false);
       await loadMoveAnimations(this.getMoveset().map(m => m.getMove().id));
       this.playAnim();
       return;
@@ -998,7 +1002,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
   getSpriteKey(ignoreOverride?: boolean): string {
     if (this.customPokemonData.forge) {
-      return forgeAppearance(this.customPokemonData.types, false, this.customPokemonData.forge.stage);
+      return forgeAppearance(
+        this.customPokemonData.types,
+        false,
+        this.customPokemonData.forge.stage,
+        this.customPokemonData.forge.body ?? forgeBodyForSeed(this.customPokemonData.forge.seed),
+        false,
+      );
     }
     return this.getSpeciesForm(ignoreOverride, false).getSpriteKey(
       this.getGender(ignoreOverride) === Gender.FEMALE,
@@ -1010,7 +1020,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
   getBattleSpriteKey(back?: boolean, ignoreOverride?: boolean): string {
     if (this.customPokemonData.forge) {
-      return forgeAppearance(this.customPokemonData.types, false, this.customPokemonData.forge.stage);
+      return forgeAppearance(
+        this.customPokemonData.types,
+        false,
+        this.customPokemonData.forge.stage,
+        this.customPokemonData.forge.body ?? forgeBodyForSeed(this.customPokemonData.forge.seed),
+        back ?? this.isPlayer(),
+      );
     }
     return `pkmn__${this.getBattleSpriteId(back, ignoreOverride)}`;
   }
@@ -1051,7 +1067,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
   getIconAtlasKey(ignoreOverride = false, useIllusion = true): string {
     if (this.customPokemonData.forge) {
-      return forgeAppearance(this.customPokemonData.types, true, this.customPokemonData.forge.stage);
+      return forgeAppearance(
+        this.customPokemonData.types,
+        true,
+        this.customPokemonData.forge.stage,
+        this.customPokemonData.forge.body ?? forgeBodyForSeed(this.customPokemonData.forge.seed),
+        false,
+      );
     }
     const illusion = this.summonData.illusion;
     const { formIndex, variant } = useIllusion && illusion ? illusion : this;

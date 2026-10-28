@@ -1,3 +1,4 @@
+import { FORGE_BODIES, type ForgeBody } from "#app/forge/body";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
 import type { BattlerTag } from "#data/battler-tags";
 import { loadBattlerTag, SerializableBattlerTag } from "#data/battler-tags";
@@ -28,6 +29,7 @@ export interface ForgePokemonData {
   stage: 1 | 2 | 3;
   events: number[];
   name?: string;
+  body?: ForgeBody;
 }
 
 /** Discard malformed saved Forge data rather than passing invalid stats to battle calculations. */
@@ -55,6 +57,7 @@ function copyForgePokemonData(data: unknown): ForgePokemonData | undefined {
     stage: candidate.stage as ForgePokemonData["stage"],
     events: [...new Set(candidate.events)],
     ...(candidate.name === undefined ? {} : { name: candidate.name }),
+    ...(FORGE_BODIES.includes(candidate.body as ForgeBody) ? { body: candidate.body as ForgeBody } : {}),
   };
 }
 

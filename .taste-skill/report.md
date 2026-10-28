@@ -13,3 +13,7 @@ User requested one mode and simple type-colored circles with type symbols, retai
 
 ## 2026-10-28: original type badges
 User replaced the procedural circle direction with original PokeRogue type images. Appearance now samples the existing pbinfo_player_type atlas with nearest-neighbor scaling. Dual types clip the full-sized first badge to the left half and the second to the right half. Browser pixel checks covered all 153 dual combinations in both field and icon sizes (306 composites), plus native battle/party/summary display.
+
+
+## 2026-10-28: universal partner pixel sprites
+Replaced temporary type badges with 36 original neutral pixel frames: six body families, three evolution stages, true front/back views. Rejected agile/heavy/armored designs were regenerated as cacomistle/takin/armadillo; armored anatomy has four mammal legs. Original native UI remains. Canonical 8-color palettes use permanent type metadata and preserve alpha; body identity persists in saves. Native browser verified 180 body/stage/view/type combinations, battle back sprites, party/summary fronts, all growth rewards and save reconstruction. 18 focused tests cover exact asset count, size, role coverage, palette geometry and saved body identity.

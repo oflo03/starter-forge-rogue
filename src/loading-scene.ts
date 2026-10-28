@@ -1,3 +1,4 @@
+import { forgeBaseSprites } from "#app/forge/sprite-assets";
 import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { activeOverrides } from "#app/overrides";
@@ -26,6 +27,9 @@ export class LoadingScene extends SceneBase {
   }
 
   preload() {
+    for (const sprite of forgeBaseSprites) {
+      this.load.image(sprite.key, sprite.url);
+    }
     localPing();
     const startingBiome = activeOverrides.STARTING_BIOME_OVERRIDE ?? globalScene?.arena?.biomeId ?? BiomeId.TOWN;
     // TODO: Categorize these into sub-methods that make sense

@@ -1,0 +1,25 @@
+<!doctype html><html><body><script>
+window.prepare = async function(family) {
+ const image=new Image();image.src='sources/'+family+'.png';await image.decode();
+ const result=[];const shades=[32,80,112,144,176,200,224,248];
+ for(let stage=1;stage<=3;stage++)for(const [row,view] of [[0,'front'],[1,'back']]){
+  const cell=document.createElement('canvas');cell.width=image.width/3;cell.height=image.height/2;
+  const c=cell.getContext('2d',{willReadFrequently:true});c.drawImage(image,(stage-1)*cell.width,row*cell.height,cell.width,cell.height,0,0,cell.width,cell.height);
+  const pixels=c.getImageData(0,0,cell.width,cell.height);let minX=cell.width,minY=cell.height,maxX=0,maxY=0;
+  const labels=new Int32Array(cell.width*cell.height),queue=new Int32Array(labels.length);let component=0,best=0,bestArea=0;
+  for(let start=0;start<labels.length;start++){
+   if(labels[start]||pixels.data[start*4+3]<200)continue;component++;let head=0,tail=1;queue[0]=start;labels[start]=component;
+   while(head<tail){const at=queue[head++],x=at%cell.width,y=Math.floor(at/cell.width);for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=cell.width||ny>=cell.height)continue;const next=ny*cell.width+nx;if(!labels[next]&&pixels.data[next*4+3]>=200){labels[next]=component;queue[tail++]=next;}}}
+   if(tail>bestArea){best=component;bestArea=tail;}
+  }
+  for(let y=0;y<cell.height;y++)for(let x=0;x<cell.width;x++){const at=y*cell.width+x,i=at*4;if(labels[at]!==best){pixels.data[i+3]=0;continue;}pixels.data[i+3]=255;minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);}
+  if(minX>maxX)throw new Error('empty '+family+stage+view);c.putImageData(pixels,0,0);
+  const canvas=document.createElement('canvas');canvas.width=96;canvas.height=96;const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.imageSmoothingEnabled=false;
+  const target=[0,36,58,84][stage],w=maxX-minX+1,h=maxY-minY+1,scale=target/Math.max(w,h),dw=Math.round(w*scale),dh=Math.round(h*scale);
+  ctx.drawImage(cell,minX,minY,w,h,Math.floor((96-dw)/2),94-dh,dw,dh);
+  const out=ctx.getImageData(0,0,96,96);let opaque=0;for(let i=0;i<out.data.length;i+=4){if(out.data[i+3]<128){out.data[i]=out.data[i+1]=out.data[i+2]=out.data[i+3]=0;continue;}const value=Math.round(.2126*out.data[i]+.7152*out.data[i+1]+.0722*out.data[i+2]);const shade=shades.reduce((best,n)=>Math.abs(n-value)<Math.abs(best-value)?n:best,shades[0]);out.data[i]=out.data[i+1]=out.data[i+2]=shade;out.data[i+3]=255;opaque++;}ctx.putImageData(out,0,0);
+  result.push({family,stage,view,file:family+'-stage'+stage+'-'+view+'.png',width:96,height:96,opaque,sourceBounds:{minX,minY,maxX,maxY},png:canvas.toDataURL('image/png').split(',')[1]});
+ }
+ return result;
+};
+</script></body></html>
