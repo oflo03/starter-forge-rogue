@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+import * as forgeRuntime from "#app/forge/runtime";
 import { getGameMode } from "#app/game-mode";
 import { handleTutorial, Tutorial } from "#app/tutorial";
 import { GameModes } from "#enums/game-modes";
+import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
+import { SelectStarterPhase } from "#phases/select-starter-phase";
 import { TitlePhase } from "#phases/title-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { initSceneWithoutEncounterPhase } from "#test/utils/game-manager-utils";
@@ -36,6 +39,26 @@ describe("Forge standalone experience", () => {
     expect(title.gameMode).toBe(GameModes.FORGE);
     expect(end).toHaveBeenCalledOnce();
     expect(mode.mock.calls.map(call => call[0])).not.toContain(UiMode.STARTER_SELECT);
+  });
+
+  it("grants the original starting money when the Forge save slot is confirmed", async () => {
+    const encounter = {
+      seed: "money-fixture",
+      type: PokemonType.NORMAL,
+      starter: { speciesId: SpeciesId.EEVEE },
+    } as Awaited<ReturnType<typeof forgeRuntime.meetForgePartner>>;
+    vi.spyOn(forgeRuntime, "meetForgePartner").mockResolvedValue(encounter);
+    const mode = vi.spyOn(game.scene.ui, "setMode").mockResolvedValue();
+    const phase = new SelectStarterPhase();
+    const init = vi.spyOn(phase, "initBattle").mockImplementation(() => {});
+    game.scene.money = 0;
+    await phase.start();
+    expect(mode.mock.calls.at(-1)?.[0]).toBe(UiMode.SAVE_SLOT);
+    const confirm = mode.mock.calls.at(-1)?.[2] as (slot: number) => void;
+    confirm(0);
+    expect(game.scene.money).toBe(1000);
+    expect(game.scene.money).toBe(game.scene.gameMode.getStartingMoney());
+    expect(init).toHaveBeenCalledWith([encounter.starter]);
   });
 
   it("skips tutorials and capture registration without modifying starter data", async () => {

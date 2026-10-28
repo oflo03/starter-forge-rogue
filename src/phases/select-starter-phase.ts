@@ -31,6 +31,7 @@ export class SelectStarterPhase extends Phase {
           return;
         }
         globalScene.sessionSlotId = slotId;
+        globalScene.money = globalScene.gameMode.getStartingMoney();
         this.initBattle([encounter.starter]);
       });
       return;
