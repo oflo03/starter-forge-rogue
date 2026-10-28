@@ -9,3 +9,7 @@
 
 ## 2026-10-28: standalone mode and temporary partner identity
 User requested one mode and simple type-colored circles with type symbols, retaining the original pixel battle UI. Title now offers adventure, load, history and settings; account, tutorial and collection menus are absent. Partner appearances are procedural local Canvas textures with 18 monochrome symbols, shared by field/summary/party and restored from permanent type metadata. Dual types split the circle and show both symbols. Native desktop browser verified growth 16/26/36/46/56, recruitment and save reconstruction with no console errors. Opponent sprites remain original.
+
+
+## 2026-10-28: original type badges
+User replaced the procedural circle direction with original PokeRogue type images. Appearance now samples the existing pbinfo_player_type atlas with nearest-neighbor scaling. Dual types clip the full-sized first badge to the left half and the second to the right half. Browser pixel checks covered all 153 dual combinations in both field and icon sizes (306 composites), plus native battle/party/summary display.
