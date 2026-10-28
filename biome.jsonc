@@ -29,6 +29,7 @@
       ".github/**/*.mts",
       "!!assets",
       "!!coverage",
+      "!!forge/vendor", // Generated maker snapshots; preserve the source transform.
       "!!dist*",
       "!!docs",
       "!!locales",

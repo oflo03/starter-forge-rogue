@@ -36,3 +36,7 @@ ignore:
    - .devcontainer
    - "LICENSES"
    - .idea
+   - .taste-skill
+   - forge/.checks
+   - forge/dist
+   - forge/node_modules

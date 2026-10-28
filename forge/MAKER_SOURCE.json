@@ -1,0 +1,13 @@
+{
+  "source": "../starter-forge",
+  "version": "1.10.0",
+  "sha256": {
+    "rankups": "ba46de460f2c3d092f308b1635b01a49715fb9f23c81385a1dbfc54f1b925ff1",
+    "original-environments": "8dd39298990b7e5b57db8eb797242becbc622a6cbba671bd29e09676faeced97",
+    "arsenal": "b5ba913e79acf5857410210429b0003a5a1f8a70a32846fa0cc046e9d85ca6e5",
+    "fan-content": "f0b62d3759d89dbe25d9a7ef0e29915044899c15ee934310a67578daf6e29e6e",
+    "environments": "7ce9e62d7285210cadc5185a65ba2ce1026be1183a98697cd72efa76f24af638",
+    "catalog": "0e94c3c7944db625d1f9150a31d084c8e25078b64c7c4a4035b9e29e5e3de0e8",
+    "engine": "c5c508f6837b4ee9d7a0a2c10ed6ff3964b2106e3f2cd5fc51a5e5532cd46c9e"
+  }
+}

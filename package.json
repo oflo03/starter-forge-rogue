@@ -43,7 +43,11 @@
     "update-submodules": "git submodule update --progress --init --recursive --force --depth 1",
     "update-submodules:remote": "pnpm update-submodules --remote",
     "sample-movesets": "vite-node scripts/gen-moveset/gen-moveset-driver.ts",
-    "game-data:export": "vitest run --config scripts/game-data-exporter/game-data-exporter.config.ts scripts/game-data-exporter/run.test.ts --"
+    "game-data:export": "vitest run --config scripts/game-data-exporter/game-data-exporter.config.ts scripts/game-data-exporter/run.test.ts --",
+    "forge:dev": "vite --config forge/vite.config.ts",
+    "forge:build": "vite build --config forge/vite.config.ts",
+    "forge:test": "node --experimental-transform-types --test forge/game.test.ts",
+    "forge:typecheck": "tsc -p forge/tsconfig.json"
   },
   "dependencies": {
     "@material/material-color-utilities": "^0.4.0",

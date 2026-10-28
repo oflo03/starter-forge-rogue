@@ -1,3 +1,11 @@
+# Starter Forge · 60 웨이브 로그 모드
+
+**[웹에서 플레이](https://starter-forge-rogue-oflo.web.app)** · **[새 모드 설명과 실행 방법](forge/README.md)**
+
+PokéRogue를 포크한 프로젝트에 별도 이미지 없는 전투 모드를 추가했습니다. 아래는 원본 PokéRogue 안내입니다.
+
+---
+
 <!--
 SPDX-FileCopyrightText: 2024-2026 Pagefault Games
 

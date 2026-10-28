@@ -1,0 +1,16 @@
+{
+  "name": "starter-forge-rogue-mode",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5187",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 5187",
+    "test": "node --experimental-transform-types --test game.test.ts"
+  },
+  "devDependencies": {
+    "vite": "^8.3.1",
+    "typescript": "^6.0.3"
+  }
+}
