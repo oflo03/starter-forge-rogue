@@ -182,7 +182,13 @@ export class MoveInfoOverlay extends Phaser.GameObjects.Container implements Inf
     this.typ.setTexture(getLocalizedSpriteKey("types"), PokemonType[move.type].toLowerCase());
     this.cat.setFrame(MoveCategory[move.category].toLowerCase());
 
-    this.desc.setText(move?.effect || "");
+    this.showDescription(move.effect || "", !this.options.delayVisibility);
+    return true;
+  }
+
+  /** Reuse the native scrolling effect panel for reward descriptions without move stats. */
+  showDescription(text: string, visible = true): void {
+    this.desc.setText(text);
 
     // stop previous scrolling effects and reset y position
     if (this.descScroll) {
@@ -205,11 +211,10 @@ export class MoveInfoOverlay extends Phaser.GameObjects.Container implements Inf
       });
     }
 
-    if (!this.options.delayVisibility) {
+    if (visible) {
       this.setVisible(true);
     }
     this.active = true;
-    return true;
   }
 
   clear() {

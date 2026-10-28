@@ -10,11 +10,12 @@ import { ModifierTier } from "#enums/modifier-tier";
 import { MoveCategory } from "#enums/move-category";
 import type { MoveId } from "#enums/move-id";
 import { Nature } from "#enums/nature";
+import { PartyUiMode } from "#enums/party-ui-mode";
 import type { PokemonType, RegularPokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
-import { ModifierType, ModifierTypeOption } from "#modifiers/modifier-type";
+import { ModifierType, ModifierTypeOption, TmModifierType } from "#modifiers/modifier-type";
 import { PokemonMove } from "#moves/pokemon-move";
 import type { Starter } from "#types/save-data";
 import type { FormModalConfig, OptionSelectItem } from "#types/ui-types";
@@ -158,35 +159,68 @@ function rewardTier(seed: string): ModifierTier {
 }
 async function chooseCards(
   title: string,
-  options: { name: string; description: string; value: any }[],
+  options: { name: string; description: string; value: any; moveId?: MoveId }[],
   seed: string,
 ): Promise<any> {
   await globalScene.ui.setMode(UiMode.MESSAGE);
   await globalScene.ui.showTextPromise(title);
   const tier = rewardTier(seed.split(":tier:")[0]);
   const items = options.map((option, i) => {
-    const item = new ModifierType("modifierType:RareCandyModifierType", "rare_candy", null);
+    const item =
+      option.moveId === undefined
+        ? new ModifierType("modifierType:RareCandyModifierType", "rare_candy", null)
+        : new TmModifierType(option.moveId);
     item.id = "forge-reward-" + i;
     item.setTier(tier);
     Object.defineProperty(item, "name", { get: () => option.name });
     item.getDescription = () => option.description;
     return new ModifierTypeOption(item, 0);
   });
-  return new Promise(resolve =>
-    globalScene.ui.setMode(
-      UiMode.MODIFIER_SELECT,
-      true,
-      items,
-      (row: number, index: number) => {
-        if (row !== 1 || index < 0 || index >= options.length) {
-          return false;
-        }
-        globalScene.ui.setMode(UiMode.MESSAGE).then(() => resolve(options[index].value));
-        return true;
-      },
-      -1,
-    ),
-  );
+  return new Promise(resolve => {
+    const show = () =>
+      globalScene.ui.setMode(
+        UiMode.MODIFIER_SELECT,
+        true,
+        items,
+        (row: number, index: number) => {
+          if (row === 0 && index === 2) {
+            globalScene.ui.setModeWithoutClear(UiMode.PARTY, PartyUiMode.CHECK, -1, show);
+            return true;
+          }
+          if (row !== 1 || index < 0 || index >= options.length) {
+            return false;
+          }
+          globalScene.ui.setMode(UiMode.MESSAGE).then(() => resolve(options[index].value));
+          return true;
+        },
+        -1,
+      );
+    show();
+  });
+}
+function moveDescription(id: MoveId): string {
+  const move = allMoves[id];
+  const category = move.category === MoveCategory.PHYSICAL ? "물리" : "특수";
+  const accuracy = move.accuracy < 0 ? "필중" : `${move.accuracy}%`;
+  const priority = move.priority ? ` · 우선도 ${move.priority > 0 ? "+" : ""}${move.priority}` : "";
+  return `${typeName(move.type)} · ${category} · 위력 ${move.power} · 명중 ${accuracy} · PP ${move.pp}${priority}\n${move.effect}`;
+}
+function linkedMoves(pokemon: PlayerPokemon, stats: number[], seed: string, abilityId: number) {
+  const choice = customAbilityChoices(growthTypes(pokemon), stats, seed).find(o => o.id === abilityId);
+  if (choice?.enhancedCategory === undefined) {
+    return [];
+  }
+  const category =
+    choice.name === "밸런스기어"
+      ? pokemon.stats[1] <= pokemon.stats[3]
+        ? MoveCategory.PHYSICAL
+        : MoveCategory.SPECIAL
+      : choice.enhancedCategory;
+  const distribution =
+    category === MoveCategory.PHYSICAL ? [100, 150, 100, 50, 100, 100] : [100, 50, 100, 150, 100, 100];
+  return customMoveChoices(growthTypes(pokemon), distribution, seed + ":links")
+    .filter(m => m.category === category)
+    .slice(0, 2);
 }
 function enhancedCategory(pokemon: PlayerPokemon, stats: number[]): MoveCategory | undefined {
   const choice = customAbilityChoices(growthTypes(pokemon), stats, "category").find(
@@ -229,7 +263,7 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
         );
         const id: MoveId = await chooseCards(
           `${name} · ${level === 16 ? "첫 진화 · " : ""}Lv.${level}\n새로운 기술을 선택하세요.`,
-          options.map(o => ({ name: o.name, description: o.description, value: o.id })),
+          options.map(o => ({ name: o.name, description: moveDescription(o.id), value: o.id, moveId: o.id })),
           seed,
         );
         let slot = pokemon.getMoveset(true).length;
@@ -253,7 +287,7 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
             "교체할 기술을 선택하세요.",
             replacements.map(({ m, i }) => ({
               name: allMoves[m.moveId].name,
-              description: allMoves[m.moveId].effect,
+              description: moveDescription(m.moveId),
               value: i,
             })),
           );
@@ -267,7 +301,12 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
           options.map(o => ({
             name: o.name,
             description:
-              o.description + (o.enhancedCategory === undefined ? "" : "\n강화되는 연계 기술2개를 함께 배웁니다."),
+              o.description
+              + (o.enhancedCategory === undefined
+                ? ""
+                : `\n함께 습득: ${linkedMoves(pokemon, stats, seed, o.id)
+                    .map(m => m.name)
+                    .join(" · ")}\n기존 기술을 최대 2개 남기고 연계 기술 2개를 배웁니다.`),
             value: o,
           })),
           seed,
@@ -279,11 +318,7 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
         }
         const category = enhancedCategory(pokemon, stats);
         if (category !== undefined) {
-          const distribution =
-            category === MoveCategory.PHYSICAL ? [100, 150, 100, 50, 100, 100] : [100, 50, 100, 150, 100, 100];
-          const linked = customMoveChoices(growthTypes(pokemon), distribution, seed + ":links")
-            .filter(m => m.category === category)
-            .slice(0, 2);
+          const linked = linkedMoves(pokemon, stats, seed, choice.id);
           if (linked.length !== 2) {
             throw new Error("연계 기술2개를 만들 수 없습니다.");
           }

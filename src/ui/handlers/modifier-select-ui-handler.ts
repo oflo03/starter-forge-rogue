@@ -26,6 +26,7 @@ const DOUBLE_SHOP_ROW_YOFFSET = 24;
 const OPTION_BUTTON_YPOSITION = -62;
 
 export class ModifierSelectUiHandler extends AwaitableUiHandler {
+  private forgeRewardInfoOverlay: MoveInfoOverlay;
   private modifierContainer: Phaser.GameObjects.Container;
   private rerollButtonContainer: Phaser.GameObjects.Container;
   private lockRarityButtonContainer: Phaser.GameObjects.Container;
@@ -150,6 +151,13 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
     ui.add(this.moveInfoOverlay);
     // register the overlay to receive toggle events
     globalScene.addInfoToggle(this.moveInfoOverlay);
+    this.forgeRewardInfoOverlay = new MoveInfoOverlay({
+      hideEffectBox: true,
+      x: 1,
+      y: -MoveInfoOverlay.getHeight(true) - 1,
+      width: globalScene.scaledCanvas.width - 2,
+    });
+    ui.add(this.forgeRewardInfoOverlay);
   }
 
   show(args: any[]): boolean {
@@ -419,6 +427,7 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
         this.awaitingActionInput = false;
         this.onActionInput = null;
         if (originalOnActionInput(this.rowCursor, this.cursor)) {
+          this.forgeRewardInfoOverlay.clear();
           this.moveInfoOverlayActive = this.moveInfoOverlay.active;
           this.moveInfoOverlay.setVisible(false);
           this.moveInfoOverlay.active = false; // this is likely unnecessary, but it should help future prove the UI
@@ -555,6 +564,7 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
 
     // the modifier selection has been updated, always hide the overlay
     this.moveInfoOverlay.clear();
+    this.forgeRewardInfoOverlay.clear();
     if (this.rowCursor) {
       if (this.rowCursor === 1 && options.length === 0) {
         // Continue button when no shop items
@@ -605,6 +615,13 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
         if (type instanceof TmModifierType) {
           // prepare the move overlay to be shown with the toggle
           this.moveInfoOverlay.show(allMoves[type.moveId]);
+          if (type.id?.startsWith("forge-reward-") && this.moveInfoOverlay.active) {
+            this.moveInfoOverlay.setVisible(true);
+            ui.showText(type.getDescription().split("\n")[0]);
+          }
+        } else if (type.id?.startsWith("forge-reward-")) {
+          this.forgeRewardInfoOverlay.showDescription(type.getDescription());
+          ui.showText("위 설명을 확인하고 선택하세요.\n파티 확인에서 현재 기술과 특성을 볼 수 있습니다.");
         }
       }
     } else if (cursor === 0) {
@@ -722,6 +739,7 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
     super.clear();
 
     this.moveInfoOverlay.clear();
+    this.forgeRewardInfoOverlay.clear();
     this.moveInfoOverlayActive = false;
     this.awaitingActionInput = false;
     this.onActionInput = null;
