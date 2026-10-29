@@ -1,16 +1,13 @@
 import { getPokemonNameWithAffix } from "#app/messages";
 import { CommonAnim } from "#enums/move-anims-common";
+import { TerrainType } from "#enums/terrain-type";
+
+// biome-ignore lint/performance/noBarrelFile: Preserve upstream imports while keeping environment enums free of battle dependencies.
+export { TerrainType } from "#enums/terrain-type";
+
 import type { Pokemon } from "#field/pokemon";
 import type { RGBArray } from "#types/sprite-types";
 import i18next from "i18next";
-
-export enum TerrainType {
-  NONE,
-  MISTY,
-  ELECTRIC,
-  GRASSY,
-  PSYCHIC,
-}
 
 export interface SerializedTerrain {
   terrainType: TerrainType;
@@ -52,6 +49,14 @@ export function getTerrainName(terrainType: TerrainType): string {
       return i18next.t("terrain:grassy");
     case TerrainType.PSYCHIC:
       return i18next.t("terrain:psychic");
+    case TerrainType.ANTHILL:
+      return "개미굴 필드";
+    case TerrainType.OCTAGON:
+      return "옥타곤 필드";
+    case TerrainType.WHITE_PAINT:
+      return "화이트 페인트 필드";
+    case TerrainType.SWAMP:
+      return "스왐프 필드";
     case TerrainType.NONE:
       return "";
   }
@@ -67,6 +72,14 @@ export function getTerrainColor(terrainType: TerrainType): RGBArray {
       return [120, 200, 80];
     case TerrainType.PSYCHIC:
       return [160, 64, 160];
+    case TerrainType.ANTHILL:
+      return [168, 120, 72];
+    case TerrainType.OCTAGON:
+      return [200, 80, 64];
+    case TerrainType.WHITE_PAINT:
+      return [240, 240, 240];
+    case TerrainType.SWAMP:
+      return [88, 112, 72];
     case TerrainType.NONE:
       return [0, 0, 0];
   }
@@ -78,6 +91,9 @@ export function getTerrainColor(terrainType: TerrainType): RGBArray {
  * @returns A string containing the appropriate terrain start text.
  */
 export function getTerrainStartMessage(terrainType: TerrainType): string {
+  if (terrainType >= TerrainType.ANTHILL) {
+    return `${getTerrainName(terrainType)}가 펼쳐졌다!`;
+  }
   switch (terrainType) {
     case TerrainType.MISTY:
       return i18next.t("terrain:mistyStartMessage");
@@ -90,6 +106,7 @@ export function getTerrainStartMessage(terrainType: TerrainType): string {
     case TerrainType.NONE:
       return "";
   }
+  return "";
 }
 
 /**
@@ -98,6 +115,9 @@ export function getTerrainStartMessage(terrainType: TerrainType): string {
  * @returns A string containing the appropriate terrain clear text.
  */
 export function getTerrainClearMessage(terrainType: TerrainType): string {
+  if (terrainType >= TerrainType.ANTHILL) {
+    return `${getTerrainName(terrainType)}가 사라졌다!`;
+  }
   switch (terrainType) {
     case TerrainType.MISTY:
       return i18next.t("terrain:mistyClearMessage");
@@ -110,6 +130,7 @@ export function getTerrainClearMessage(terrainType: TerrainType): string {
     case TerrainType.NONE:
       return "";
   }
+  return "";
 }
 
 /**
@@ -119,6 +140,9 @@ export function getTerrainClearMessage(terrainType: TerrainType): string {
  * @returns A string containing the appropriate terrain block text.
  */
 export function getTerrainBlockMessage(pokemon: Pokemon, terrainType: TerrainType): string {
+  if (terrainType >= TerrainType.ANTHILL) {
+    return `${getTerrainName(terrainType)}의 효과로 막혔다!`;
+  }
   switch (terrainType) {
     case TerrainType.MISTY:
       return i18next.t("terrain:mistyBlockMessage", {
@@ -134,6 +158,7 @@ export function getTerrainBlockMessage(pokemon: Pokemon, terrainType: TerrainTyp
     case TerrainType.NONE:
       return "";
   }
+  return "";
 }
 
 /**
@@ -142,5 +167,8 @@ export function getTerrainBlockMessage(pokemon: Pokemon, terrainType: TerrainTyp
  * @returns The {@linkcode CommonAnim} for the given terrain
  */
 export function getTerrainAnim(terrainType: TerrainType): CommonAnim {
+  if (terrainType >= TerrainType.ANTHILL) {
+    return CommonAnim.GRASSY_TERRAIN;
+  }
   return (CommonAnim.MISTY_TERRAIN + (terrainType - 1)) as CommonAnim;
 }

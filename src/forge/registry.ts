@@ -4,6 +4,10 @@ import {
   BlockCritAbAttr,
   LowHpMoveTypePowerBoostAbAttr,
   MoveDamageBoostAbAttr,
+  PostBiomeChangeTerrainChangeAbAttr,
+  PostBiomeChangeWeatherChangeAbAttr,
+  PostSummonTerrainChangeAbAttr,
+  PostSummonWeatherChangeAbAttr,
   PostTurnHealAbAttr,
   PostVictoryStatStageChangeAbAttr,
   ReceivedMoveDamageMultiplierAbAttr,
@@ -11,11 +15,14 @@ import {
 } from "#abilities/ab-attrs";
 import { AbBuilder, type Ability } from "#abilities/ability";
 import { allAbilities, allMoves } from "#data/data-lists";
+import type { TerrainType } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
+import { MultiHitType } from "#enums/multi-hit-type";
 import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
+import type { WeatherType } from "#enums/weather-type";
 import {
   AttackMove,
   CritOnlyAttr,
@@ -23,9 +30,26 @@ import {
   HighCritAttr,
   HitHealAttr,
   type Move,
+  MultiHitAttr,
   RecoilAttr,
   StatStageChangeAttr,
+  TerrainChangeAttr,
+  WeatherChangeAttr,
 } from "#moves/move";
+import { FORGE_TERRAINS, FORGE_WEATHERS } from "./environment";
+
+/** Attack setters still deal damage when the same environment is already active. */
+class ForgeWeatherAttackAttr extends WeatherChangeAttr {
+  override getCondition() {
+    return () => true;
+  }
+}
+class ForgeTerrainAttackAttr extends TerrainChangeAttr {
+  override getCondition() {
+    return () => true;
+  }
+}
+
 // Catalog data supplies names and parameters; all battle effects below use upstream attributes.
 import Catalog from "../../forge/vendor/catalog.js";
 import Maker from "../../forge/vendor/engine.js";
@@ -110,8 +134,12 @@ const starterAbilities = new Map<PokemonType, AbilityId>([
   [PokemonType.GRASS, AbilityId.OVERGROW],
   [PokemonType.BUG, AbilityId.SWARM],
 ]);
-const registeredMoves: (ForgeMoveChoice & { source: CatalogMove })[] = [];
+const registeredMoves: (ForgeMoveChoice & { source: CatalogMove; rewardStage: number })[] = [];
 const registeredAbilities = new Map<string, ForgeAbilityChoice>();
+const registeredPassives: (ForgeAbilityChoice & {
+  affinity: readonly PokemonType[];
+  environment: "weather" | "terrain" | "support";
+})[] = [];
 let initialized = false;
 
 function addAbility(builder: AbBuilder, name: string, description: string): ForgeAbilityChoice {
@@ -192,7 +220,7 @@ export function initializeForgeRegistry(): void {
     }
     registeredAbilities.set(key, addAbility(builder, source.name, rewardDescriptions[key]));
   }
-  // Append awakenings after the original abilities so existing save IDs remain stable.
+  // Preserve legacy awakening IDs; new runs choose one active ability and one passive instead.
   for (let tier = 1; tier <= 4; tier++) {
     const suffix = tier === 1 ? "-awakened" : `-awakened-${tier}`;
     const damage = [0, 1.65, 1.8, 1.95, 2.1][tier];
@@ -269,124 +297,161 @@ export function initializeForgeRegistry(): void {
   const sources = (library.moves as CatalogMove[])
     .filter(source => templates.has(source.templateId) && source.source !== "원작 기반")
     .sort((left, right) => left.id.localeCompare(right.id, "en"));
-  for (const source of sources) {
-    const type = typeIds.indexOf(source.type) as PokemonType;
-    const category = source.category === "물리" ? MoveCategory.PHYSICAL : MoveCategory.SPECIAL;
-    if (type < 0 || !["물리", "특수"].includes(source.category)) {
-      continue;
-    }
-    const isFlinch = source.templateId === "flinch" || source.templateId === "special-flinch";
-    if (
-      !Number.isFinite(source.power)
-      || source.power <= 0
-      || !Number.isInteger(source.pp)
-      || source.pp < 1
-      || !Number.isInteger(source.priority)
-      || (source.templateId !== "sure"
-        && (typeof source.accuracy !== "number"
-          || !Number.isFinite(source.accuracy)
-          || source.accuracy < 1
-          || source.accuracy > 100))
-      || (source.debuffChance !== undefined
-        && (!Number.isFinite(source.debuffChance) || source.debuffChance < 0 || source.debuffChance > 1))
-      || (isFlinch
-        && (typeof source.flinchChance !== "number"
-          || !Number.isFinite(source.flinchChance)
-          || source.flinchChance < 0
-          || source.flinchChance > 1))
-    ) {
-      continue;
-    }
-    if (["beam", "erode", "crush"].includes(source.templateId)) {
-      const expectedStat = source.templateId === "crush" ? "def" : "spd";
-      // Do not quietly substitute a different status effect if the catalog changes.
+  for (let rewardStage = 0; rewardStage <= 4; rewardStage++) {
+    for (const source of sources) {
+      const type = typeIds.indexOf(source.type) as PokemonType;
+      const category = source.category === "물리" ? MoveCategory.PHYSICAL : MoveCategory.SPECIAL;
+      if (type < 0 || !["물리", "특수"].includes(source.category)) {
+        continue;
+      }
+      const isFlinch = source.templateId === "flinch" || source.templateId === "special-flinch";
       if (
-        !source.targetDebuffs
-        || Object.keys(source.targetDebuffs).length !== 1
-        || source.targetDebuffs[expectedStat] !== -1
+        !Number.isFinite(source.power)
+        || source.power <= 0
+        || !Number.isInteger(source.pp)
+        || source.pp < 1
+        || !Number.isInteger(source.priority)
+        || (source.templateId !== "sure"
+          && (typeof source.accuracy !== "number"
+            || !Number.isFinite(source.accuracy)
+            || source.accuracy < 1
+            || source.accuracy > 100))
+        || (source.debuffChance !== undefined
+          && (!Number.isFinite(source.debuffChance) || source.debuffChance < 0 || source.debuffChance > 1))
+        || (isFlinch
+          && (typeof source.flinchChance !== "number"
+            || !Number.isFinite(source.flinchChance)
+            || source.flinchChance < 0
+            || source.flinchChance > 1))
       ) {
         continue;
       }
+      if (["beam", "erode", "crush"].includes(source.templateId)) {
+        const expectedStat = source.templateId === "crush" ? "def" : "spd";
+        // Do not quietly substitute a different status effect if the catalog changes.
+        if (
+          !source.targetDebuffs
+          || Object.keys(source.targetDebuffs).length !== 1
+          || source.targetDebuffs[expectedStat] !== -1
+        ) {
+          continue;
+        }
+      }
+      let chance = isFlinch
+        ? Math.round(source.flinchChance! * 100)
+        : ["beam", "erode", "crush"].includes(source.templateId)
+          ? Math.round((source.debuffChance ?? 1) * 100)
+          : -1;
+      const dropsDefense = ["beam", "erode", "crush"].includes(source.templateId);
+      if (dropsDefense && rewardStage >= 2) {
+        chance = Math.max(chance, [0, 0, 50, 75, 100][rewardStage]);
+      }
+      const powerFloors: Record<string, number> = {
+        strike: 100,
+        beam: 110,
+        recoil: 140,
+        "recoil-light": 120,
+        sure: 90,
+        quick: 70,
+        drain: 90,
+        siphon: 90,
+        erode: 95,
+        crush: 110,
+        flinch: 80,
+        "special-flinch": 75,
+        critical: 90,
+      };
+      const basePower = source.alwaysCrit
+        ? Math.min(70, source.power)
+        : Math.max(source.power, powerFloors[source.templateId] ?? 0);
+      let power = source.alwaysCrit
+        ? basePower
+        : Math.round(
+            Math.min(
+              source.templateId.includes("recoil") ? 200 : source.priority > 0 ? 100 : 170,
+              basePower * (1 + rewardStage * 0.15),
+            ) / 5,
+          ) * 5;
+      const doubleStrike = source.templateId === "strike" && rewardStage >= 3;
+      if (doubleStrike) {
+        power = Math.round((power * 0.65) / 5) * 5;
+      }
+      const priority = source.priority + (source.templateId === "quick" && rewardStage === 4 ? 1 : 0);
+      let description = source.effect;
+      if (doubleStrike) {
+        description = "2번 연속 공격한다. 위력은 1타 기준.";
+      }
+      if (dropsDefense && rewardStage >= 2) {
+        description = `${chance}% 확률로 대상의 ${source.templateId === "crush" ? "방어를" : "특방을"} 1단계 내린다.`;
+      }
+      if (["drain", "siphon"].includes(source.templateId) && rewardStage === 4) {
+        description = "실제로 준 HP 피해의 3/4만큼 자신의 HP를 회복한다.";
+      }
+      if (source.templateId === "quick") {
+        description = `우선도 +${priority}로 공격한다.`;
+      }
+      const move = new AttackMove(
+        MoveId.TACKLE,
+        type,
+        category,
+        power,
+        source.templateId === "sure" ? -1 : (source.accuracy as number),
+        source.pp,
+        chance,
+        priority,
+        9,
+      );
+      switch (source.templateId) {
+        case "drain":
+        case "siphon":
+          move.attr(HitHealAttr, rewardStage === 4 ? 0.75 : 0.5).healingMove();
+          break;
+        case "recoil":
+        case "recoil-light":
+          move.attr(RecoilAttr, false, source.templateId === "recoil" ? 1 / 3 : 1 / 4).recklessMove();
+          break;
+        case "beam":
+        case "erode":
+          move.attr(StatStageChangeAttr, [Stat.SPDEF], -1);
+          break;
+        case "crush":
+          move.attr(StatStageChangeAttr, [Stat.DEF], -1);
+          break;
+        case "critical":
+          move.attr(source.alwaysCrit ? CritOnlyAttr : HighCritAttr);
+          break;
+        case "flinch":
+        case "special-flinch":
+          move.attr(FlinchAttr);
+          break;
+      }
+      if (doubleStrike) {
+        move.attr(MultiHitAttr, MultiHitType.TWO);
+      }
+      move.id = allMoves.length as MoveId;
+      // Preserve custom text if a language refresh invokes Move.localize later.
+      Object.defineProperty(move, "localize", {
+        value: () => {
+          move.name = source.name;
+          move.effect = description;
+        },
+      });
+      move.localize();
+      Object.defineProperty(move, "forgeAnimation", { value: MoveId.TACKLE });
+      (allMoves as Move[]).push(move);
+      registeredMoves.push({
+        id: move.id,
+        name: source.name,
+        description,
+        type,
+        category,
+        power,
+        source,
+        rewardStage,
+      });
     }
-    const chance = isFlinch
-      ? Math.round(source.flinchChance! * 100)
-      : ["beam", "erode", "crush"].includes(source.templateId)
-        ? Math.round((source.debuffChance ?? 1) * 100)
-        : -1;
-    const powerFloors: Record<string, number> = {
-      strike: 100,
-      beam: 110,
-      recoil: 140,
-      "recoil-light": 120,
-      sure: 90,
-      quick: 70,
-      drain: 90,
-      siphon: 90,
-      erode: 95,
-      crush: 110,
-      flinch: 80,
-      "special-flinch": 75,
-      critical: 90,
-    };
-    const power = source.alwaysCrit
-      ? Math.min(70, source.power)
-      : Math.max(source.power, powerFloors[source.templateId] ?? 0);
-    const move = new AttackMove(
-      MoveId.TACKLE,
-      type,
-      category,
-      power,
-      source.templateId === "sure" ? -1 : (source.accuracy as number),
-      source.pp,
-      chance,
-      source.priority,
-      9,
-    );
-    switch (source.templateId) {
-      case "drain":
-      case "siphon":
-        move.attr(HitHealAttr, 0.5).healingMove();
-        break;
-      case "recoil":
-      case "recoil-light":
-        move.attr(RecoilAttr, false, source.templateId === "recoil" ? 1 / 3 : 1 / 4).recklessMove();
-        break;
-      case "beam":
-      case "erode":
-        move.attr(StatStageChangeAttr, [Stat.SPDEF], -1);
-        break;
-      case "crush":
-        move.attr(StatStageChangeAttr, [Stat.DEF], -1);
-        break;
-      case "critical":
-        move.attr(source.alwaysCrit ? CritOnlyAttr : HighCritAttr);
-        break;
-      case "flinch":
-      case "special-flinch":
-        move.attr(FlinchAttr);
-        break;
-    }
-    move.id = allMoves.length as MoveId;
-    // Preserve custom text if a language refresh invokes Move.localize later.
-    Object.defineProperty(move, "localize", {
-      value: () => {
-        move.name = source.name;
-        move.effect = source.effect;
-      },
-    });
-    move.localize();
-    Object.defineProperty(move, "forgeAnimation", { value: MoveId.TACKLE });
-    (allMoves as Move[]).push(move);
-    registeredMoves.push({
-      id: move.id,
-      name: source.name,
-      description: source.effect,
-      type,
-      category,
-      power,
-      source,
-    });
   }
+  initializeEnvironmentRewards();
   initialized = true;
 }
 
@@ -412,6 +477,97 @@ function statsPair(stats: Stats): [number, number] {
   return Array.isArray(stats) ? [stats[1], stats[3]] : [stats.atk, stats.spa];
 }
 
+function initializeEnvironmentRewards(): void {
+  for (const definition of FORGE_WEATHERS) {
+    const ability = addAbility(
+      new AbBuilder(AbilityId.BLAZE, 9)
+        .attr(PostSummonWeatherChangeAbAttr, definition.type)
+        .attr(PostBiomeChangeWeatherChangeAbAttr, definition.type),
+      definition.name,
+      `등장 시 ${definition.description}`,
+    );
+    registeredPassives.push({ ...ability, affinity: definition.affinity, environment: "weather" });
+  }
+  for (const definition of FORGE_TERRAINS) {
+    const ability = addAbility(
+      new AbBuilder(AbilityId.BLAZE, 9)
+        .attr(PostSummonTerrainChangeAbAttr, definition.type)
+        .attr(PostBiomeChangeTerrainChangeAbAttr, definition.type),
+      definition.name,
+      `등장 시 ${definition.description}`,
+    );
+    registeredPassives.push({ ...ability, affinity: definition.affinity, environment: "terrain" });
+  }
+  for (const definition of [...FORGE_WEATHERS, ...FORGE_TERRAINS]) {
+    const weather = FORGE_WEATHERS.some(entry => entry === definition);
+    for (const category of [MoveCategory.PHYSICAL, MoveCategory.SPECIAL]) {
+      for (let rewardStage = 2; rewardStage <= 4; rewardStage++) {
+        const type = definition.affinity[0];
+        const power = 95 + (rewardStage - 2) * 15;
+        const move = new AttackMove(MoveId.TACKLE, type, category, power, 100, 10, -1, 0, 9);
+        if (weather) {
+          move.attr(ForgeWeatherAttackAttr, definition.type as WeatherType);
+        } else {
+          move.attr(ForgeTerrainAttackAttr, definition.type as TerrainType);
+        }
+        const name = definition.move + (category === MoveCategory.PHYSICAL ? "" : "탄");
+        const description = `공격 후 ${definition.description}`;
+        move.id = allMoves.length as MoveId;
+        Object.defineProperty(move, "localize", {
+          value: () => {
+            move.name = name;
+            move.effect = description;
+          },
+        });
+        Object.defineProperty(move, "forgeAnimation", { value: MoveId.TACKLE });
+        move.localize();
+        (allMoves as Move[]).push(move);
+        registeredMoves.push({
+          id: move.id,
+          name,
+          description,
+          type,
+          category,
+          power,
+          rewardStage,
+          source: {
+            id: `environment-${definition.move}-${category}`,
+            name,
+            effect: description,
+            type: typeIds[type],
+            category: category === MoveCategory.PHYSICAL ? "물리" : "특수",
+            power,
+            accuracy: 100,
+            pp: 10,
+            priority: 0,
+            source: "창작",
+            templateId: weather ? "weather" : "terrain",
+          },
+        });
+      }
+    }
+  }
+}
+
+export function customPassiveChoices(types: PokemonType[], stats: Stats, seed: string): ForgeAbilityChoice[] {
+  initializeForgeRegistry();
+  const choices: ForgeAbilityChoice[] = [];
+  for (const environment of ["weather", "terrain"] as const) {
+    const pool = registeredPassives.filter(choice => choice.environment === environment);
+    const matching = pool.filter(choice => choice.affinity.some(type => types.includes(type)));
+    choices.push(seededOrder(matching.length > 0 ? matching : pool, `${seed}:${environment}`)[0]);
+  }
+  const [attack, special] = statsPair(stats);
+  const supports =
+    attack + special >= 190
+      ? [AbilityId.SPEED_BOOST, AbilityId.SERENE_GRACE]
+      : [AbilityId.MAGIC_GUARD, AbilityId.REGENERATOR];
+  const id = seededOrder(supports, seed)[0];
+  const ability = allAbilities[id];
+  choices.push({ id, name: ability.name, description: ability.description });
+  return seededOrder(choices, `${seed}:passives`);
+}
+
 function seededOrder<T>(items: T[], seed: string): T[] {
   const random = Maker.createRng(seed);
   const result = [...items];
@@ -428,13 +584,20 @@ export function customMoveChoices(
   seed: string,
   excludedIds: readonly MoveId[] = [],
   preferredCategory?: MoveCategory,
+  rewardLevel = 11,
 ): ForgeMoveChoice[] {
   initializeForgeRegistry();
   const [attack, special] = statsPair(stats);
+  const rewardStage = Math.max(0, Math.min(4, Math.floor((rewardLevel - 11) / 10)));
+  const learnedFamilies = new Set(
+    registeredMoves.filter(move => excludedIds.includes(move.id)).map(move => move.source.id),
+  );
   const candidates = registeredMoves.filter(
     move =>
       types.includes(move.type)
+      && move.rewardStage === rewardStage
       && !excludedIds.includes(move.id)
+      && !learnedFamilies.has(move.source.id)
       && (!move.source.alwaysCrit
         || (move.power <= 70 && (move.category === MoveCategory.PHYSICAL ? attack : special) <= 110)),
   );
@@ -446,7 +609,7 @@ export function customMoveChoices(
   ];
   const choices: typeof ordered = [];
   for (const predicate of [
-    (move: (typeof ordered)[number]) => move.power >= 100,
+    (move: (typeof ordered)[number]) => move.power >= 100 || (move.source.templateId === "strike" && rewardStage >= 3),
     (move: (typeof ordered)[number]) => ["drain", "siphon", "erode", "crush", "beam"].includes(move.source.templateId),
     (move: (typeof ordered)[number]) =>
       move.source.priority > 0
@@ -475,7 +638,18 @@ export function customMoveChoices(
       choices[choices.length - 1] = secondary;
     }
   }
-  return choices.map(({ source: _source, ...choice }) => choice);
+  if (rewardStage >= 2) {
+    const environment = ordered.find(move => ["weather", "terrain"].includes(move.source.templateId));
+    if (environment && !choices.some(move => move.id === environment.id)) {
+      const keepsSecondary =
+        types.length > 1
+        && environment.type !== types[1]
+        && choices.at(-1)?.type === types[1]
+        && !choices.slice(0, -1).some(move => move.type === types[1]);
+      choices[keepsSecondary ? 1 : choices.length - 1] = environment;
+    }
+  }
+  return choices.map(({ source: _source, rewardStage: _stage, ...choice }) => choice);
 }
 
 export function customAbilityChoices(

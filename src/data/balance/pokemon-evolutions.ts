@@ -3,6 +3,7 @@ import { globalScene } from "#app/global-scene";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { allMoves } from "#data/data-lists";
 import { type Gender, getGenderSymbol } from "#data/gender";
+import { matchesWeather } from "#data/weather";
 import type { BiomeId } from "#enums/biome-id";
 import { MoveId } from "#enums/move-id";
 import type { Nature } from "#enums/nature";
@@ -198,7 +199,7 @@ export class SpeciesEvolutionCondition {
         case EvoCondKey.BIOME:
           return cond.biome.includes(globalScene.arena.biomeId);
         case EvoCondKey.WEATHER:
-          return cond.weather.includes(globalScene.arena.weatherType);
+          return matchesWeather(globalScene.arena.weatherType, cond.weather);
         case EvoCondKey.TYROGUE:
           return (
             pokemon.getMoveset(true).find(m => (tyrogueMoves as readonly MoveId[]).includes(m.moveId))?.moveId

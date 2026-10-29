@@ -11,6 +11,7 @@ import type {
 } from "#abilities/ab-attrs";
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { loggedInUser } from "#app/account";
+import { forgeGalePriority, forgeWeatherActive } from "#app/forge/environment";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import type { EntryHazardTag, PendingHealTag } from "#data/arena-tag";
@@ -35,7 +36,7 @@ import { SpeciesFormChangeRevertWeatherFormTrigger } from "#data/form-change-tri
 import { getNonVolatileStatusEffects, getStatusEffectHealText, isNonVolatileStatusEffect } from "#data/status-effect";
 import { TerrainType } from "#data/terrain";
 import { getTypeDamageMultiplier } from "#data/type";
-import { getEffectiveWeatherForMove } from "#data/weather";
+import { getEffectiveWeatherForMove, matchesWeather } from "#data/weather";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -1087,6 +1088,9 @@ export abstract class Move implements Localizable {
        */
       moveAccuracy.value = Math.floor(moveAccuracy.value * 0.9);
     }
+    if (getEffectiveWeatherForMove(user) === WeatherType.SILENT_MIST) {
+      moveAccuracy.value *= 0.7;
+    }
 
     if (!isOhko && globalScene.arena.getTag(ArenaTagType.GRAVITY)) {
       moveAccuracy.value = Math.floor(moveAccuracy.value * 1.67);
@@ -1183,7 +1187,7 @@ export abstract class Move implements Localizable {
 
     power.value *= (source.getTag(BattlerTagType.SUPREME_OVERLORD) as SupremeOverlordTag | undefined)?.getBoost() ?? 1;
 
-    if (source.isGrounded()) {
+    if (source.isGrounded() || globalScene.arena.terrainType >= TerrainType.ANTHILL) {
       power.value *= globalScene.arena.getTerrainPowerMultiplier(source.getMoveType(this));
     }
 
@@ -1203,7 +1207,7 @@ export abstract class Move implements Localizable {
     applyMoveAttrs("IncrementMovePriorityAttr", user, null, this, priority);
     applyAbAttrs("ChangeMovePriorityAbAttr", { pokemon: user, simulated, move: this, priority });
 
-    return priority.value;
+    return priority.value + forgeGalePriority(user);
   }
 
   public getPriorityModifier(user: Pokemon, simulated = true): MovePriorityInBracket {
@@ -1244,6 +1248,9 @@ export abstract class Move implements Localizable {
       simulated: true,
     };
     applyAbAttrs("AiMovegenMoveStatsAbAttr", params);
+    if (globalScene.arena?.terrainType === TerrainType.ANTHILL) {
+      maxMultiHit.value = true;
+    }
 
     const params2 = {
       pokemon,
@@ -1782,6 +1789,9 @@ export class MoveEffectAttr extends MoveAttr {
 
     if (!selfEffect) {
       applyAbAttrs("IgnoreMoveEffectsAbAttr", { pokemon: target, move, simulated: !showAbility, chance: moveChance });
+    }
+    if (this.is("FlinchAttr") && forgeWeatherActive(WeatherType.SILENT_MIST) && moveChance.value > 0) {
+      moveChance.value = Math.min(100, moveChance.value * 2);
     }
     return moveChance.value;
   }
@@ -2964,6 +2974,9 @@ export class MultiHitAttr extends MoveAttr {
   getHitCount(user: Pokemon, _target: Pokemon): number {
     switch (this.multiHitType) {
       case MultiHitType.TWO_TO_FIVE: {
+        if (globalScene.arena.terrainType === TerrainType.ANTHILL) {
+          return 5;
+        }
         const rand = user.randBattleSeedInt(20);
         const hitValue = new NumberHolder(rand);
         applyAbAttrs("MaxMultiHitAbAttr", { pokemon: user, hits: hitValue });
@@ -3693,7 +3706,7 @@ export class WeatherInstantChargeAttr extends InstantChargeAttr {
   constructor(weatherTypes: WeatherType[]) {
     super((user: Pokemon) => {
       const effectiveWeather = getEffectiveWeatherForMove(user);
-      return this.weatherTypes.includes(effectiveWeather);
+      return matchesWeather(effectiveWeather, this.weatherTypes);
     });
 
     this.weatherTypes = weatherTypes;
@@ -4975,10 +4988,13 @@ export class AntiSunlightPowerDecreaseAttr extends VariablePowerAttr {
       const power = args[0] as NumberHolder;
       switch (weatherType) {
         case WeatherType.RAIN:
+        case WeatherType.THUNDERSTORM:
         case WeatherType.SANDSTORM:
         case WeatherType.HAIL:
         case WeatherType.SNOW:
         case WeatherType.FOG:
+        case WeatherType.DARK_AURA:
+        case WeatherType.SILENT_MIST:
         case WeatherType.HEAVY_RAIN:
           power.value *= 0.5;
           return true;
@@ -5460,6 +5476,7 @@ export class ThunderAccuracyAttr extends VariableAccuracyAttr {
           accuracy.value = 50;
           return true;
         case WeatherType.RAIN:
+        case WeatherType.THUNDERSTORM:
         case WeatherType.HEAVY_RAIN:
           accuracy.value = -1;
           return true;
@@ -5482,6 +5499,7 @@ export class StormAccuracyAttr extends VariableAccuracyAttr {
       const accuracy = args[0] as NumberHolder;
       switch (weatherType) {
         case WeatherType.RAIN:
+        case WeatherType.THUNDERSTORM:
         case WeatherType.HEAVY_RAIN:
           accuracy.value = -1;
           return true;
@@ -5899,12 +5917,26 @@ export class WeatherBallTypeAttr extends VariableMoveTypeAttr {
     }
 
     const weatherType = getEffectiveWeatherForMove(user);
+    const customType = (
+      {
+        [WeatherType.DARK_AURA]: PokemonType.DARK,
+        [WeatherType.GALE]: PokemonType.FLYING,
+        [WeatherType.SILENT_MIST]: PokemonType.GHOST,
+        [WeatherType.POISON_GAS]: PokemonType.POISON,
+        [WeatherType.THUNDERSTORM]: PokemonType.ELECTRIC,
+      } as Partial<Record<WeatherType, PokemonType>>
+    )[weatherType];
+    if (customType !== undefined) {
+      moveType.value = customType;
+      return true;
+    }
     switch (weatherType) {
       case WeatherType.SUNNY:
       case WeatherType.HARSH_SUN:
         moveType.value = PokemonType.FIRE;
         break;
       case WeatherType.RAIN:
+      case WeatherType.THUNDERSTORM:
       case WeatherType.HEAVY_RAIN:
         moveType.value = PokemonType.WATER;
         break;
@@ -5927,11 +5959,24 @@ export class WeatherBallTypeAttr extends VariableMoveTypeAttr {
 
   override getTypeForMovegen(user: Pokemon, move: Move): PokemonType {
     const userAbilityAttrs = user.getAbilityAttrs("PostSummonWeatherChangeAbAttr");
+    const custom = (
+      {
+        [WeatherType.DARK_AURA]: PokemonType.DARK,
+        [WeatherType.GALE]: PokemonType.FLYING,
+        [WeatherType.SILENT_MIST]: PokemonType.GHOST,
+        [WeatherType.POISON_GAS]: PokemonType.POISON,
+        [WeatherType.THUNDERSTORM]: PokemonType.ELECTRIC,
+      } as Partial<Record<WeatherType, PokemonType>>
+    )[userAbilityAttrs.at(-1)?.weatherType ?? WeatherType.NONE];
+    if (custom !== undefined) {
+      return custom;
+    }
     switch (userAbilityAttrs.at(-1)?.weatherType) {
       case WeatherType.SUNNY:
       case WeatherType.HARSH_SUN:
         return PokemonType.FIRE;
       case WeatherType.RAIN:
+      case WeatherType.THUNDERSTORM:
       case WeatherType.HEAVY_RAIN:
         return PokemonType.WATER;
       case WeatherType.SANDSTORM:
@@ -5957,12 +6002,24 @@ export class TerrainPulseTypeAttr extends VariableMoveTypeAttr {
       return false;
     }
 
-    if (!user.isGrounded()) {
+    if (!user.isGrounded() && globalScene.arena.terrainType < TerrainType.ANTHILL) {
       return false;
     }
 
     const currentTerrain = globalScene.arena.terrainType;
     switch (currentTerrain) {
+      case TerrainType.ANTHILL:
+        moveType.value = PokemonType.BUG;
+        break;
+      case TerrainType.OCTAGON:
+        moveType.value = PokemonType.FIGHTING;
+        break;
+      case TerrainType.SWAMP:
+        moveType.value = PokemonType.GROUND;
+        break;
+      case TerrainType.WHITE_PAINT:
+        moveType.value = PokemonType.NORMAL;
+        break;
       case TerrainType.MISTY:
         moveType.value = PokemonType.FAIRY;
         break;
@@ -7244,6 +7301,9 @@ export class ForceSwitchOutAttr extends MoveEffectAttr {
 
   apply(user: Pokemon, target: Pokemon, move: Move, _args: any[]): boolean {
     // Check if the move category is not STATUS or if the switch out condition is not met
+    if (globalScene.arena.terrainType === TerrainType.OCTAGON && (this.selfSwitch ? user : target).hp > 0) {
+      return false;
+    }
     if (!this.getSwitchOutCondition()(user, target, move)) {
       return false;
     }
@@ -7933,6 +7993,14 @@ export class NaturePowerAttr extends CallMoveAttr {
         return MoveId.PSYCHIC;
       case TerrainType.MISTY:
         return MoveId.MOONBLAST;
+      case TerrainType.ANTHILL:
+        return MoveId.BUG_BUZZ;
+      case TerrainType.OCTAGON:
+        return MoveId.AURA_SPHERE;
+      case TerrainType.WHITE_PAINT:
+        return MoveId.HYPER_VOICE;
+      case TerrainType.SWAMP:
+        return MoveId.EARTH_POWER;
     }
 
     terrain satisfies TerrainType.NONE;
@@ -9027,13 +9095,18 @@ const sunnyHealRatioFunc = (user: Pokemon): number => {
     case WeatherType.HARSH_SUN:
       return 2 / 3;
     case WeatherType.RAIN:
+    case WeatherType.THUNDERSTORM:
     case WeatherType.SANDSTORM:
     case WeatherType.HAIL:
     case WeatherType.SNOW:
     case WeatherType.HEAVY_RAIN:
     case WeatherType.FOG:
+    case WeatherType.DARK_AURA:
+    case WeatherType.SILENT_MIST:
       return 1 / 4;
     case WeatherType.STRONG_WINDS:
+    case WeatherType.GALE:
+    case WeatherType.POISON_GAS:
     case WeatherType.NONE:
       return 1 / 2;
   }
@@ -12147,7 +12220,10 @@ export function initMoves() {
     new AttackMove(MoveId.TERRAIN_PULSE, PokemonType.NORMAL, MoveCategory.SPECIAL, 50, 100, 10, -1, 0, 8)
       .attr(TerrainPulseTypeAttr)
       .attr(MovePowerMultiplierAttr, (user, _target, _move) =>
-        globalScene.arena.terrainType !== TerrainType.NONE && user.isGrounded() ? 2 : 1,
+        globalScene.arena.terrainType !== TerrainType.NONE
+        && (user.isGrounded() || globalScene.arena.terrainType >= TerrainType.ANTHILL)
+          ? 2
+          : 1,
       )
       .pulseMove(),
     new AttackMove(MoveId.SKITTER_SMACK, PokemonType.BUG, MoveCategory.PHYSICAL, 70, 90, 10, 100, 0, 8) //

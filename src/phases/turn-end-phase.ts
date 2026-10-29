@@ -1,4 +1,5 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
+import { forgeSwampTick } from "#app/forge/environment";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { TerrainType } from "#data/terrain";
@@ -32,6 +33,10 @@ export class TurnEndPhase extends FieldPhase {
 
     const handlePokemon = (pokemon: Pokemon) => {
       if (!pokemon.switchOutStatus) {
+        forgeSwampTick(pokemon);
+        if (pokemon.hp <= 0) {
+          return;
+        }
         pokemon.lapseTags(BattlerTagLapseType.TURN_END);
 
         globalScene.applyModifiers(TurnHealModifier, pokemon.isPlayer(), pokemon);

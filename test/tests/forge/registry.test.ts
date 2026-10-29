@@ -35,6 +35,7 @@ describe("Forge original engine registry", () => {
     copy.forge!.events.push(36);
     expect(forge.events).not.toContain(36);
     expect(new CustomPokemonData({ forge: { ...forge, events: [12] } }).forge).toBeUndefined();
+    expect(new CustomPokemonData({ forge: { ...forge, events: [16, 26, 36, 46, 56] } }).forge?.ivReward).toBe(true);
   });
   it("adds custom effects once without replacing any original entry", () => {
     const originalMove = allMoves[MoveId.TACKLE];
@@ -179,9 +180,9 @@ describe("Forge original engine registry", () => {
 
   it("registers both flinch variants for every type with the original flinch attribute", () => {
     const customFlinches = allMoves.filter(move => MoveId[move.id] === undefined && move.hasAttr("FlinchAttr"));
-    expect(customFlinches).toHaveLength(36);
+    expect(customFlinches).toHaveLength(36 * 5);
     for (let type = PokemonType.NORMAL; type <= PokemonType.FAIRY; type++) {
-      const variants = customFlinches.filter(move => move.type === type);
+      const variants = customFlinches.slice(0, 36).filter(move => move.type === type);
       expect(variants).toHaveLength(2);
       expect(variants.find(move => move.category === MoveCategory.PHYSICAL)?.chance).toBe(30);
       expect(variants.find(move => move.category === MoveCategory.SPECIAL)?.chance).toBe(20);

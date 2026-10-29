@@ -72,6 +72,22 @@ describe("Forge standalone experience", () => {
     expect(mode).not.toHaveBeenCalled();
   });
 
+  it("offers three distinct final-evolution types excluding the current type", () => {
+    for (let original = 0; original < 18; original++) {
+      const seen = new Set<number>();
+      for (let i = 0; i < 100; i++) {
+        const seed = `evolution-${i}`;
+        const choices = forgeRuntime.forgePartnerTypeChoices(seed, [original]);
+        expect(choices).toHaveLength(3);
+        expect(new Set(choices).size).toBe(3);
+        expect(choices).not.toContain(original);
+        expect(choices).toEqual(forgeRuntime.forgePartnerTypeChoices(seed, [original]));
+        choices.forEach(type => seen.add(type));
+      }
+      expect(seen.size).toBe(17);
+    }
+  });
+
   it("grants the original starting money when the Forge save slot is confirmed", async () => {
     const encounter = {
       seed: "money-fixture",

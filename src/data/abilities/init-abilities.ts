@@ -2275,6 +2275,9 @@ const anticipationCondition: AbAttrCondition = (pokemon: Pokemon) =>
  * and as part of the conditions for similar type-changing abilities
  */
 const anyTypeMoveConversionCondition: PokemonAttackCondition = (user, _target, move): boolean => {
+  if (globalScene.arena.terrainType === TerrainType.WHITE_PAINT) {
+    return false;
+  }
   if (noAbilityTypeOverrideMoves.has(move.id)) {
     return false;
   }

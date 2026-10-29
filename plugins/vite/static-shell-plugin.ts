@@ -186,6 +186,7 @@ export function staticShellPlugin(): VitePlugin {
       const galleryDir = path.join(outDir, "art", "normal-base");
       fs.mkdirSync(galleryDir, { recursive: true });
       fs.copyFileSync("forge/art/normal-base/index.html", path.join(galleryDir, "index.html"));
+      fs.copyFileSync("forge/CONTENT_LINEUP.md", path.join(outDir, "CONTENT_LINEUP.md"));
       fs.rmSync(path.join(outDir, ".vite"), { recursive: true, force: true });
 
       logger.info(`${green(`✓ Rewrote index.html into a deploy-invariant shell (entry: ${entry.file})`)}${logSuffix}`);

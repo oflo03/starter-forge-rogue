@@ -1,4 +1,5 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
+import { clearForgeGasWithWind, forgeGasBackfire } from "#app/forge/environment";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { activeOverrides } from "#app/overrides";
@@ -23,6 +24,7 @@ import { MoveResult } from "#enums/move-result";
 import { isIgnorePP, isIgnoreStatus, isReflected, isVirtual, MoveUseMode } from "#enums/move-use-mode";
 import { PokemonType } from "#enums/pokemon-type";
 import { StatusEffect } from "#enums/status-effect";
+import { WeatherType } from "#enums/weather-type";
 import { MoveUsedEvent } from "#events/battle-scene";
 import type { Pokemon } from "#field/pokemon";
 import { applyMoveAttrs } from "#moves/apply-attrs";
@@ -728,10 +730,14 @@ export class MovePhase extends PokemonPhase {
       }
       this.failed = true;
     } else if (arena.isMoveWeatherCancelled(user, move)) {
+      if (arena.weatherType === WeatherType.POISON_GAS) {
+        forgeGasBackfire(user);
+      }
       failedText = getWeatherBlockMessage(globalScene.arena.weatherType);
       this.failed = true;
     } else {
       // Powder *always* happens last
+      clearForgeGasWithWind(user, move);
       // Note: Powder's lapse method handles everything: messages, damage, animation, primal weather interaction,
       // determining type of type changing moves, etc.
       // It will set this phase's `failed` flag to true if it procs

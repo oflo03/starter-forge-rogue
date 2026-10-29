@@ -1598,6 +1598,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         }
         break;
       case Stat.SPD: {
+        if (
+          globalScene.arena.terrainType === TerrainType.SWAMP
+          && this.isGrounded()
+          && !this.getTypes().some(type => type === PokemonType.WATER || type === PokemonType.GROUND)
+        ) {
+          ret *= 0.5;
+        }
         const side = this.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY;
         if (globalScene.arena.getTagOnSide(ArenaTagType.TAILWIND, side)) {
           ret *= 2;
@@ -2151,6 +2158,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     ignoreThirdType?: boolean;
     forMoveGen?: boolean;
   } = {}): Writable<NonEmptyTuple<PokemonType>> {
+    if (!forMoveGen && globalScene.arena?.terrainType === TerrainType.WHITE_PAINT) {
+      return [PokemonType.NORMAL];
+    }
     const teraType = this.getTeraType();
     // Stellar tera does nothing defensively (uses original types)
     const shouldUseTeraStellar = !(returnOriginalTypesIfStellar && teraType === PokemonType.STELLAR);
@@ -2653,6 +2663,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @returns `true` if the pokemon is trapped
    */
   public isTrapped(trappedAbMessages: string[] = [], simulated = true): boolean {
+    if (globalScene.arena.terrainType === TerrainType.OCTAGON) {
+      return true;
+    }
     const commandedTag = this.getTag(BattlerTagType.COMMANDED);
     if (commandedTag?.getSourcePokemon()?.isActive(true)) {
       return true;
@@ -2708,6 +2721,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @returns The {@linkcode PokemonType} of the move after attributes are applied
    */
   public getMoveType(move: Move, simulated = true): PokemonType {
+    if (globalScene.arena.terrainType === TerrainType.WHITE_PAINT) {
+      return PokemonType.NORMAL;
+    }
     const moveTypeHolder = new NumberHolder(move.type);
 
     applyMoveAttrs("VariableMoveTypeAttr", this, null, move, moveTypeHolder);
@@ -3606,6 +3622,15 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
     const userAccStage = new NumberHolder(this.getStatStage(Stat.ACC));
     const targetEvaStage = new NumberHolder(target.getStatStage(Stat.EVA));
+    if (
+      globalScene.arena.terrainType === TerrainType.ANTHILL
+      && target.getTypes().some(type => type === PokemonType.GROUND || type === PokemonType.BUG)
+    ) {
+      targetEvaStage.value = Math.min(6, targetEvaStage.value + 1);
+    }
+    if (globalScene.arena.terrainType === TerrainType.OCTAGON) {
+      targetEvaStage.value = 0;
+    }
 
     const ignoreAccStatStage = new BooleanHolder(false);
     const ignoreEvaStatStage = new BooleanHolder(false);
@@ -3668,7 +3693,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       });
     }
 
-    return accuracyMultiplier.value / evasionMultiplier.value;
+    return (
+      accuracyMultiplier.value / (globalScene.arena.terrainType === TerrainType.OCTAGON ? 1 : evasionMultiplier.value)
+    );
   }
 
   /**

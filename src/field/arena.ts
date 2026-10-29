@@ -420,6 +420,9 @@ export class Arena {
     }
 
     const oldTerrainType = this.terrainType;
+    for (const pokemon of globalScene.getField(true)) {
+      pokemon.summonData.forgeSwampCount = 5;
+    }
 
     const terrainDuration = new NumberHolder(0);
 
@@ -501,6 +504,12 @@ export class Arena {
    * which depends on the _target's_ groundedness (not the user's).
    */
   public getTerrainPowerMultiplier(attackType: PokemonType): number {
+    if (
+      (this.terrainType === TerrainType.ANTHILL && attackType === PokemonType.BUG)
+      || (this.terrainType === TerrainType.OCTAGON && attackType === PokemonType.FIGHTING)
+    ) {
+      return 1.2;
+    }
     if (this.terrainType === TerrainType.ELECTRIC && attackType === PokemonType.ELECTRIC) {
       return 1.3;
     }

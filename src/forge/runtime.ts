@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+
+import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { PLAYER_PARTY_MAX_SIZE } from "#app/constants";
 import { forgeBodyForSeed } from "#app/forge/body";
 import { globalScene } from "#app/global-scene";
@@ -30,7 +32,13 @@ import { forgeAppearance, forgeTypeChoice } from "./appearance";
 import { DraftInputGate } from "./draft-input";
 import { animateForgeEvolution } from "./evolution";
 import { FORGE_ABILITY_LEVELS, FORGE_MILESTONES, FORGE_MOVE_LEVELS } from "./progression";
-import { customAbilityChoices, customMoveChoices, starterAbility, starterMoves } from "./registry";
+import {
+  customAbilityChoices,
+  customMoveChoices,
+  customPassiveChoices,
+  starterAbility,
+  starterMoves,
+} from "./registry";
 
 const types = Array.from({ length: 18 }, (_, i) => i as PokemonType);
 const statKeys = ["hp", "atk", "def", "spa", "spd", "spe"];
@@ -39,9 +47,10 @@ export const randomForgeSeed = () =>
   Array.from(crypto.getRandomValues(new Uint32Array(2)), n => n.toString(16).padStart(8, "0")).join("");
 const typeName = (type: PokemonType) => i18next.t(getPokemonTypeLocaleKey(type));
 const growthTypes = (pokemon: PlayerPokemon) =>
-  pokemon
-    .getTypes({ includeTeraType: false, bypassSummonData: true, ignoreThirdType: true })
-    .filter(type => types.includes(type));
+  (pokemon.customPokemonData.forge
+    ? pokemon.customPokemonData.types
+    : pokemon.getTypes({ includeTeraType: false, bypassSummonData: true, ignoreThirdType: true })
+  ).filter((type): type is PokemonType => type !== null && types.includes(type));
 const finalStats = (seed: string): number[] => {
   const stats = Maker.generateStats(seed).stats;
   return statKeys.map(key => stats[key]);
@@ -93,9 +102,9 @@ function nickname(previewTexture?: string): Promise<string> {
     open();
   });
 }
-export function forgePartnerTypeChoices(seed: string): PokemonType[] {
+export function forgePartnerTypeChoices(seed: string, excluded: readonly PokemonType[] = []): PokemonType[] {
   const random = Maker.createRng(seed);
-  const pool = [...types];
+  const pool = types.filter(type => !excluded.includes(type));
   return Array.from({ length: 3 }, () => pool.splice(random.int(0, pool.length - 1), 1)[0]);
 }
 export async function meetForgePartner(
@@ -260,34 +269,36 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
   try {
     const stats = finalStats(data.seed);
     for (const level of FORGE_MILESTONES) {
-      if (level <= previousLevel || level > pokemon.level || data.events.includes(level)) {
+      const missingPassive = level === 26 && pokemon.customPokemonData.passive === -1;
+      const missingIvs = level === 46 && !data.ivReward;
+      if (
+        level <= previousLevel
+        || level > pokemon.level
+        || (data.events.includes(level) && !missingPassive && !missingIvs)
+      ) {
         continue;
       }
       const rewardBase = data.seed + ":reward:" + level;
       const rarity = rewardTier(rewardBase);
       const seed = rewardBase + ":tier:" + rarity;
       const name = pokemon.getNameToRender({ useIllusion: false });
-      if (level === 36) {
-        const remaining = types.filter(t => !growthTypes(pokemon).includes(t));
-        const groups = [remaining.slice(0, 6), remaining.slice(6, 12), remaining.slice(12)];
-        const group: PokemonType[] = await chooseCards(
+      if (level === 36 && data.stage < 3) {
+        const options = forgePartnerTypeChoices(seed, growthTypes(pokemon));
+        const type: PokemonType = await chooseCards(
           `${name} · 추가 타입`,
-          groups.map((values, i) => ({
-            name: ["새로운 가능성", "다른 빛깔", "마지막 퍼즐"][i],
-            description: values.map(typeName).join(" · "),
-            value: values,
+          options.map(type => ({
+            name: typeName(type),
+            description: "",
+            value: type,
+            previewTexture: forgeTypeChoice(type),
           })),
           seed,
-        );
-        const type: PokemonType = await chooseList(
-          "추가 타입",
-          group.map(t => ({ name: typeName(t), value: t })),
         );
         await animateForgeEvolution(pokemon, 3, evolutionStats(stats, 3), [
           pokemon.customPokemonData.types[0]!,
           type as RegularPokemonType,
         ]);
-      } else if (level === 16) {
+      } else if (level === 16 && data.stage < 2) {
         await animateForgeEvolution(pokemon, 2, evolutionStats(stats, 2));
       }
       if (FORGE_MOVE_LEVELS.includes(level)) {
@@ -297,6 +308,7 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
           seed,
           pokemon.getMoveset(true).map(m => m.moveId),
           enhancedCategory(pokemon, stats),
+          level,
         );
         const id: MoveId = await chooseCards(
           `${name} · Lv.${level} · 기술`,
@@ -334,9 +346,12 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
           pokemon.moveset[slot] = new PokemonMove(id);
         }
       } else if (FORGE_ABILITY_LEVELS.includes(level)) {
-        const options = customAbilityChoices(growthTypes(pokemon), stats, seed, FORGE_ABILITY_LEVELS.indexOf(level));
+        const passive = level === 26;
+        const options = passive
+          ? customPassiveChoices(growthTypes(pokemon), stats, seed)
+          : customAbilityChoices(growthTypes(pokemon), stats, seed);
         const choice = await chooseCards(
-          `${name} · ${level >= 26 ? "특성 각성" : "특성"}`,
+          `${name} · ${passive ? "패시브" : "특성"}`,
           options.map(o => ({
             name: o.name,
             description: o.description,
@@ -344,13 +359,25 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
           })),
           seed,
         );
-        pokemon.customPokemonData.ability = choice.id;
+        if (passive) {
+          pokemon.customPokemonData.passive = choice.id;
+          pokemon.passive = true;
+        } else {
+          pokemon.customPokemonData.ability = choice.id;
+        }
         if (pokemon.isFusion()) {
           pokemon.fusionCustomPokemonData ??= new CustomPokemonData();
-          pokemon.fusionCustomPokemonData.ability = choice.id;
+          if (passive) {
+            pokemon.fusionCustomPokemonData.passive = choice.id;
+          } else {
+            pokemon.fusionCustomPokemonData.ability = choice.id;
+          }
+        }
+        if (pokemon.isOnField() && pokemon.hp > 0) {
+          applyAbAttrs("PostSummonAbAttr", { pokemon });
         }
       }
-      if (level === 56) {
+      if (level === 46 && !data.ivReward) {
         const dominant = stats[1] >= stats[3] ? 1 : 3;
         const selection = await chooseCards(
           `${name} · 개체값 조정`,
@@ -373,8 +400,11 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
               : selection;
           pokemon.ivs[stat] = 31;
         }
+        data.ivReward = true;
       }
-      data.events.push(level);
+      if (!data.events.includes(level)) {
+        data.events.push(level);
+      }
       pokemon.calculateStats();
       await pokemon.updateInfo();
     }

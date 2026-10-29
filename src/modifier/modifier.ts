@@ -1,4 +1,5 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
+import { forgeWeatherActive } from "#app/forge/environment";
 import { audioManager } from "#app/global-audio-manager";
 import { globalScene } from "#app/global-scene";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
@@ -26,6 +27,7 @@ import { BATTLE_STATS, type PermanentStat, Stat, TEMP_BATTLE_STATS, type TempBat
 import { StatusEffect } from "#enums/status-effect";
 import { TextStyle } from "#enums/text-style";
 import type { VoucherType } from "#enums/voucher-type";
+import { WeatherType } from "#enums/weather-type";
 import type { PlayerPokemon, Pokemon } from "#field/pokemon";
 import type {
   DoubleBattleChanceBoosterModifierType,
@@ -1614,7 +1616,12 @@ export class FlinchChanceModifier extends PokemonHeldItemModifier {
   override apply(pokemon: Pokemon, flinched: BooleanHolder): boolean {
     // The check for pokemon.summonData is to ensure that a crash doesn't occur when a Pokemon with King's Rock procs a flinch
     // TODO: Since summonData is always defined now, we can probably remove this
-    if (pokemon.summonData && !flinched.value && pokemon.randBattleSeedInt(100) < this.getStackCount() * this.chance) {
+    if (
+      pokemon.summonData
+      && !flinched.value
+      && pokemon.randBattleSeedInt(100)
+        < this.getStackCount() * this.chance * (forgeWeatherActive(WeatherType.SILENT_MIST) ? 2 : 1)
+    ) {
       flinched.value = true;
       return true;
     }

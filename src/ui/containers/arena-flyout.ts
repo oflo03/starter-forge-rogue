@@ -1,7 +1,7 @@
 import { globalScene } from "#app/global-scene";
 import type { ArenaTag } from "#data/arena-tag";
-import { type Terrain, TerrainType } from "#data/terrain";
-import { isWeatherSuppressed, type Weather } from "#data/weather";
+import { getTerrainName, type Terrain, TerrainType } from "#data/terrain";
+import { getCustomWeatherName, isWeatherSuppressed, type Weather } from "#data/weather";
 import { ArenaEventType } from "#enums/arena-event-type";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -362,7 +362,7 @@ export class ArenaFlyout extends Phaser.GameObjects.Container {
     }
 
     this.weatherInfo = {
-      name: this.localizeEffectName(WeatherType[event.weatherType]),
+      name: getCustomWeatherName(event.weatherType) ?? this.localizeEffectName(WeatherType[event.weatherType]),
       maxDuration: event.maxDuration,
       duration: event.duration,
       weatherType: event.weatherType,
@@ -389,7 +389,10 @@ export class ArenaFlyout extends Phaser.GameObjects.Container {
     }
 
     this.terrainInfo = {
-      name: this.localizeEffectName(TerrainType[event.terrainType]),
+      name:
+        event.terrainType >= TerrainType.ANTHILL
+          ? getTerrainName(event.terrainType)
+          : this.localizeEffectName(TerrainType[event.terrainType]),
       maxDuration: event.maxDuration,
       duration: event.duration,
       terrainType: event.terrainType,

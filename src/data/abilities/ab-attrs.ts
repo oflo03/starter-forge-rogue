@@ -1,4 +1,5 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
+import { forgeWeatherActive } from "#app/forge/environment";
 import { globalScene } from "#app/global-scene";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
 import { getPokemonNameWithAffix } from "#app/messages";
@@ -11,7 +12,7 @@ import { getPokeballName } from "#data/pokeball";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { getStatusEffectDescriptor, getStatusEffectHealText } from "#data/status-effect";
 import { TerrainType } from "#data/terrain";
-import { isWeatherSuppressed, type Weather } from "#data/weather";
+import { getWeatherForForms, isWeatherSuppressed, matchesWeather, type Weather } from "#data/weather";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -1946,7 +1947,9 @@ export class PostAttackApplyBattlerTagAbAttr extends PostAttackAbAttr {
       && pokemon !== opponent
       && (!this.contactRequired
         || move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: opponent, target: pokemon }))
-      && pokemon.randBattleSeedInt(100) < this.chance(opponent, pokemon, move)
+      && pokemon.randBattleSeedInt(100)
+        < this.chance(opponent, pokemon, move)
+          * (this.effects.includes(BattlerTagType.FLINCHED) && forgeWeatherActive(WeatherType.SILENT_MIST) ? 2 : 1)
       && !pokemon.status
     );
   }
@@ -3698,7 +3701,7 @@ export class BlockWeatherDamageAttr extends PreWeatherDamageAbAttr {
       return false;
     }
     const weatherType = weather.weatherType;
-    return this.weatherTypes.length === 0 || this.weatherTypes.includes(weatherType);
+    return this.weatherTypes.length === 0 || matchesWeather(weatherType, this.weatherTypes);
   }
 
   override apply({ cancelled }: PreWeatherEffectAbAttrParams): void {
@@ -3894,7 +3897,7 @@ export class PostWeatherChangeFormChangeAbAttr extends PostWeatherChangeAbAttr {
     // and is instead reading the weather from the global scene
     const weatherType = globalScene.arena.weather?.weatherType;
 
-    if (weatherType && this.formRevertingWeathers.includes(weatherType)) {
+    if (weatherType && matchesWeather(getWeatherForForms(weatherType), this.formRevertingWeathers)) {
       globalScene.arena.triggerWeatherBasedFormChangesToNormal();
     } else {
       globalScene.arena.triggerWeatherBasedFormChanges();
@@ -5762,6 +5765,9 @@ class ForceSwitchOutHelper {
    */
   // TODO: Make this cancel pending move phases on the switched out target
   public switchOutLogic(pokemon: Pokemon): boolean {
+    if (globalScene.arena.terrainType === TerrainType.OCTAGON && pokemon.hp > 0) {
+      return false;
+    }
     const switchOutTarget = pokemon;
     /*
      * If the switch-out target is a player-controlled Pokémon, the function checks:
@@ -6129,7 +6135,7 @@ export function getWeatherCondition(...weatherTypes: WeatherType[]): AbAttrCondi
     if (isWeatherSuppressed()) {
       return false;
     }
-    return weatherTypes.includes(globalScene.arena.weatherType);
+    return matchesWeather(globalScene.arena.weatherType, weatherTypes);
   };
 }
 

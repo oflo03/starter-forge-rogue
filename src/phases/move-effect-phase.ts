@@ -6,6 +6,7 @@ import { ConditionalProtectTag } from "#data/arena-tag";
 import { MoveAnim } from "#data/battle-anims";
 import { ProtectedTag, SemiInvulnerableTag, SubstituteTag, TypeBoostTag } from "#data/battler-tags";
 import { SpeciesFormChangePostMoveTrigger } from "#data/form-change-triggers";
+import { TerrainType } from "#data/terrain";
 import type { TypeDamageMultiplier } from "#data/type";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import type { BattlerIndex } from "#enums/battler-index";
@@ -411,7 +412,9 @@ export class MoveEffectPhase extends PokemonPhase {
     // unless the move is flagged to check all hits and the user does not have Skill Link.
     if (
       user.turnData.hitsLeft < user.turnData.hitCount
-      && (!move.hasFlag(MoveFlags.CHECK_ALL_HITS) || user.hasAbilityWithAttr("MaxMultiHitAbAttr"))
+      && (!move.hasFlag(MoveFlags.CHECK_ALL_HITS)
+        || user.hasAbilityWithAttr("MaxMultiHitAbAttr")
+        || globalScene.arena.terrainType === TerrainType.ANTHILL)
     ) {
       return [HitCheckResult.HIT, effectiveness];
     }

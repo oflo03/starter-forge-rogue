@@ -31,6 +31,8 @@ export interface ForgeDraftConfig {
 export class ForgeDraftUiHandler extends UiHandler {
   private root: Phaser.GameObjects.Container;
   private borders: Phaser.GameObjects.Rectangle[] = [];
+  private cards: Phaser.GameObjects.Container[] = [];
+  private animations: Phaser.Tweens.Tween[] = [];
   private partyText: Phaser.GameObjects.Text | undefined;
   private config: ForgeDraftConfig | undefined;
   private accepted = false;
@@ -46,6 +48,7 @@ export class ForgeDraftUiHandler extends UiHandler {
   }
 
   show(args: any[]): boolean {
+    this.stopAnimations();
     const config = args[0] as ForgeDraftConfig;
     if (this.config !== config) {
       this.cursor = 0;
@@ -61,10 +64,17 @@ export class ForgeDraftUiHandler extends UiHandler {
     this.root.removeAll(true).setVisible(true);
     this.getUi().moveTo(this.root, this.getUi().length - 1);
     this.borders = [];
+    this.cards = [];
     this.partyText = undefined;
     const { width, height } = globalScene.scaledCanvas;
     this.root.add(globalScene.add.rectangle(0, 0, width, height, 0x101827).setOrigin(0));
-    this.root.add(addTextObject(9, 7, config.title.replaceAll("\n", " · "), TextStyle.PARTY, { fontSize: "48px" }));
+    const title = addTextObject(9, 7, config.title.replaceAll("\n", " · "), TextStyle.PARTY, { fontSize: "48px" });
+    this.root.add(title);
+    const reducedMotion = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+    if (!reducedMotion) {
+      title.setAlpha(0);
+      this.animate({ targets: title, alpha: 1, duration: 250 });
+    }
     const gap = 6;
     const count = config.options.length;
     const cardWidth = Math.floor((width - 16 - gap * (count - 1)) / count);
@@ -74,6 +84,7 @@ export class ForgeDraftUiHandler extends UiHandler {
     config.options.forEach((option, index) => {
       const x = 8 + index * (cardWidth + gap);
       const card = globalScene.add.container(x, 27);
+      this.cards.push(card);
       const border = globalScene.add
         .rectangle(0, 0, cardWidth, cardHeight, 0x202c40)
         .setOrigin(0)
@@ -118,6 +129,29 @@ export class ForgeDraftUiHandler extends UiHandler {
           this.choose();
         });
       this.root.add(card);
+      if (!reducedMotion) {
+        card
+          .setPosition(x + cardWidth * 0.02, 51)
+          .setScale(0.96)
+          .setAlpha(0);
+        this.animate({
+          targets: card,
+          x,
+          y: 27,
+          scaleX: 1,
+          scaleY: 1,
+          alpha: 1,
+          delay: 80 + index * 100,
+          duration: 480,
+          ease: "Back.easeOut",
+        });
+        const glint = globalScene.add
+          .rectangle(2, 2, cardWidth - 4, 2, 0xffe9ae)
+          .setOrigin(0)
+          .setAlpha(0);
+        card.add(glint);
+        this.animate({ targets: glint, alpha: 0.9, delay: 440 + index * 100, duration: 170, yoyo: true });
+      }
     });
     if (config.onParty) {
       this.partyText = addTextObject(width - 10, height - 16, "파티 확인", TextStyle.PARTY, {
@@ -155,7 +189,25 @@ export class ForgeDraftUiHandler extends UiHandler {
       this.config.onParty?.();
     } else {
       this.accepted = true;
-      this.config.onChoose(this.cursor);
+      const config = this.config;
+      const index = this.cursor;
+      if (globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true) {
+        config.onChoose(index);
+      } else {
+        this.cards.forEach((card, i) => {
+          if (i !== index) {
+            this.animate({ targets: card, alpha: 0.3, y: 32, duration: 180 });
+          }
+        });
+        this.borders[index].setStrokeStyle(3, 0xffe9ae).setFillStyle(0x34435c);
+        this.animate({
+          targets: this.cards[index],
+          y: 23,
+          duration: 210,
+          ease: "Sine.easeOut",
+          onComplete: () => config.onChoose(index),
+        });
+      }
     }
     return true;
   }
@@ -186,13 +238,26 @@ export class ForgeDraftUiHandler extends UiHandler {
   }
 
   override clear(): void {
+    this.stopAnimations();
     super.clear();
     this.root.setVisible(false);
     this.setMouseCursorStyle("default");
   }
 
   override destroy(): void {
+    this.stopAnimations();
     globalScene.game.events.off("input_up", this.releaseButton);
     globalScene.input.off("pointerup", this.releasePointer);
+  }
+
+  private animate(config: Phaser.Types.Tweens.TweenBuilderConfig): void {
+    this.animations.push(globalScene.tweens.add(config));
+  }
+
+  private stopAnimations(): void {
+    for (const tween of this.animations) {
+      tween.stop();
+    }
+    this.animations = [];
   }
 }

@@ -31,6 +31,7 @@ export interface ForgePokemonData {
   events: number[];
   name?: string;
   body?: ForgeBody;
+  ivReward?: boolean;
 }
 
 /** Discard malformed saved Forge data rather than passing invalid stats to battle calculations. */
@@ -47,8 +48,9 @@ function copyForgePokemonData(data: unknown): ForgePokemonData | undefined {
     || !candidate.baseStats.every(value => Number.isInteger(value) && value >= 1 && value <= 255)
     || ![1, 2, 3].includes(candidate.stage ?? 0)
     || !Array.isArray(candidate.events)
-    || !candidate.events.every(value => FORGE_MILESTONES.includes(value))
+    || !candidate.events.every(value => FORGE_MILESTONES.includes(value) || value === 56)
     || (candidate.name !== undefined && typeof candidate.name !== "string")
+    || (candidate.ivReward !== undefined && typeof candidate.ivReward !== "boolean")
   ) {
     return undefined;
   }
@@ -57,6 +59,7 @@ function copyForgePokemonData(data: unknown): ForgePokemonData | undefined {
     baseStats: [...candidate.baseStats],
     stage: candidate.stage as ForgePokemonData["stage"],
     events: [...new Set(candidate.events)],
+    ...(candidate.ivReward || candidate.events.includes(56) ? { ivReward: true } : {}),
     ...(candidate.name === undefined ? {} : { name: candidate.name }),
     ...(FORGE_BODIES.includes(candidate.body as ForgeBody) ? { body: candidate.body as ForgeBody } : {}),
   };
@@ -143,6 +146,8 @@ interface SerializedPokemonSummonData {
  */
 // TODO: Change these `null`s into `undefined`s to save on storage space (or use custom serialization to skip them entirely)
 export class PokemonSummonData {
+  /** Native summon reset clears the Swamp countdown on switching. */
+  public forgeSwampCount = 5;
   /** [Atk, Def, SpAtk, SpDef, Spd, Acc, Eva] */
   public statStages: number[] = [0, 0, 0, 0, 0, 0, 0];
   /**

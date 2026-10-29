@@ -1,7 +1,7 @@
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import type { SpeciesFormChange } from "#data/pokemon-forms";
-import { isWeatherSuppressed } from "#data/weather";
+import { getWeatherForForms, isWeatherSuppressed, matchesWeather } from "#data/weather";
 import { AbilityId } from "#enums/ability-id";
 import { Challenges } from "#enums/challenges";
 import { FormChangeItem } from "#enums/form-change-item";
@@ -277,7 +277,7 @@ export class SpeciesFormChangeWeatherTrigger extends SpeciesFormChangeTrigger {
       !isAbilitySuppressed
       && !isWeatherSuppressed()
       && pokemon.hasAbility(this.ability)
-      && this.weathers.includes(currentWeather)
+      && matchesWeather(getWeatherForForms(currentWeather), this.weathers)
     );
   }
 }
@@ -313,7 +313,12 @@ export class SpeciesFormChangeRevertWeatherFormTrigger extends SpeciesFormChange
       const summonDataAbility = pokemon.summonData.ability;
       const isAbilityChanged = summonDataAbility !== this.ability && summonDataAbility !== AbilityId.NONE;
 
-      if (this.weathers.includes(currentWeather) || isWeatherSuppressed() || isAbilitySuppressed || isAbilityChanged) {
+      if (
+        matchesWeather(getWeatherForForms(currentWeather), this.weathers)
+        || isWeatherSuppressed()
+        || isAbilitySuppressed
+        || isAbilityChanged
+      ) {
         return true;
       }
     }

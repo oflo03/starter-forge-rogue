@@ -1,4 +1,5 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
+import { forgeWeatherTick } from "#app/forge/environment";
 import { globalScene } from "#app/global-scene";
 import { getWeatherAnim, getWeatherDamageMessage, getWeatherLapseMessage } from "#data/weather";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -66,6 +67,11 @@ export class WeatherEffectPhase extends CommonAnimPhase {
       }
     }
 
+    this.executeForAll(pokemon => {
+      if (!pokemon.switchOutStatus && pokemon.hp > 0) {
+        forgeWeatherTick(pokemon);
+      }
+    });
     globalScene.ui.showText(getWeatherLapseMessage(weather.weatherType), null, () => {
       this.executeForAll((pokemon: Pokemon) => {
         if (!pokemon.switchOutStatus) {
