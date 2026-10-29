@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import { AUGMENT_TIER_NAMES } from "#app/forge/augments";
 import { DraftInputGate } from "#app/forge/draft-input";
 import { globalScene } from "#app/global-scene";
 import { Button } from "#enums/buttons";
@@ -25,6 +26,8 @@ export interface ForgeDraftConfig {
   tier: ModifierTier;
   onChoose: (index: number) => void;
   onParty?: () => void;
+  rerollsRemaining?: number[];
+  onReroll?: (index: number) => boolean;
 }
 
 /** Three immediately readable augment cards, separate from item rewards and their animations. */
@@ -34,6 +37,7 @@ export class ForgeDraftUiHandler extends UiHandler {
   private cards: Phaser.GameObjects.Container[] = [];
   private animations: Phaser.Tweens.Tween[] = [];
   private partyText: Phaser.GameObjects.Text | undefined;
+  private rerollButtons: { background: Phaser.GameObjects.Rectangle; label: Phaser.GameObjects.Text }[] = [];
   private config: ForgeDraftConfig | undefined;
   private accepted = false;
   private readonly inputGate = new DraftInputGate();
@@ -50,6 +54,7 @@ export class ForgeDraftUiHandler extends UiHandler {
   show(args: any[]): boolean {
     this.stopAnimations();
     const config = args[0] as ForgeDraftConfig;
+    const rerolledIndex = args[1] as number | undefined;
     if (this.config !== config) {
       this.cursor = 0;
     }
@@ -66,12 +71,13 @@ export class ForgeDraftUiHandler extends UiHandler {
     this.borders = [];
     this.cards = [];
     this.partyText = undefined;
+    this.rerollButtons = [];
     const { width, height } = globalScene.scaledCanvas;
     this.root.add(globalScene.add.rectangle(0, 0, width, height, 0x101827).setOrigin(0));
     const title = addTextObject(9, 7, config.title.replaceAll("\n", " · "), TextStyle.PARTY, { fontSize: "48px" });
     this.root.add(title);
     const reducedMotion = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
-    if (!reducedMotion) {
+    if (!reducedMotion && rerolledIndex === undefined) {
       title.setAlpha(0);
       this.animate({ targets: title, alpha: 1, duration: 250 });
     }
@@ -80,7 +86,14 @@ export class ForgeDraftUiHandler extends UiHandler {
     const cardWidth = Math.floor((width - 16 - gap * (count - 1)) / count);
     const cardHeight = height - 51;
     const color =
-      config.tier === ModifierTier.ULTRA ? 0xd5b16b : config.tier === ModifierTier.GREAT ? 0x7ba2c9 : 0x98a3b4;
+      config.tier === ModifierTier.ULTRA ? 0x88e7f3 : config.tier === ModifierTier.GREAT ? 0xe2b75b : 0xaeb8c9;
+    if (config.onReroll) {
+      this.root.add(
+        addTextObject(width - 9, 10, AUGMENT_TIER_NAMES[config.tier], TextStyle.PARTY, { fontSize: "34px" })
+          .setOrigin(1, 0)
+          .setColor(`#${color.toString(16).padStart(6, "0")}`),
+      );
+    }
     config.options.forEach((option, index) => {
       const x = 8 + index * (cardWidth + gap);
       const card = globalScene.add.container(x, 27);
@@ -115,12 +128,35 @@ export class ForgeDraftUiHandler extends UiHandler {
         wordWrap: { width: (cardWidth - 16) * 6, useAdvancedWrap: true },
       }).setColor("#e4eaf1");
       for (const size of [34, 32, 30, 28]) {
-        if (description.displayHeight <= cardHeight - descriptionY - 8) {
+        if (description.displayHeight <= cardHeight - descriptionY - (config.onReroll ? 29 : 8)) {
           break;
         }
         description.setFontSize(size);
       }
       card.add(description);
+      if (config.onReroll) {
+        const left = config.rerollsRemaining?.[index] ?? 0;
+        const background = globalScene.add
+          .rectangle(7, cardHeight - 22, cardWidth - 14, 16, 0x152031)
+          .setOrigin(0)
+          .setStrokeStyle(1, left ? color : 0x465365);
+        const label = addTextObject(cardWidth / 2, cardHeight - 20, `새로고침 ${left}`, TextStyle.PARTY, {
+          fontSize: "32px",
+        })
+          .setOrigin(0.5, 0)
+          .setColor(left ? "#dce5ee" : "#718093");
+        card.add([background, label]);
+        if (left > 0) {
+          background
+            .setInteractive({ useHandCursor: true })
+            .on("pointerover", () => this.setCursor(count + index))
+            .on("pointerdown", () => {
+              this.setCursor(count + index);
+              this.reroll(index);
+            });
+        }
+        this.rerollButtons.push({ background, label });
+      }
       border
         .setInteractive({ useHandCursor: true })
         .on("pointerover", () => this.setCursor(index))
@@ -129,7 +165,7 @@ export class ForgeDraftUiHandler extends UiHandler {
           this.choose();
         });
       this.root.add(card);
-      if (!reducedMotion) {
+      if (!reducedMotion && (rerolledIndex === undefined || rerolledIndex === index)) {
         card
           .setPosition(x + cardWidth * 0.02, 51)
           .setScale(0.96)
@@ -159,9 +195,9 @@ export class ForgeDraftUiHandler extends UiHandler {
       }).setOrigin(1, 0);
       this.partyText
         .setInteractive({ useHandCursor: true })
-        .on("pointerover", () => this.setCursor(config.options.length))
+        .on("pointerover", () => this.setCursor(config.options.length * (config.onReroll ? 2 : 1)))
         .on("pointerdown", () => {
-          this.setCursor(config.options.length);
+          this.setCursor(config.options.length * (config.onReroll ? 2 : 1));
           this.choose();
         });
       this.root.add(this.partyText);
@@ -172,19 +208,31 @@ export class ForgeDraftUiHandler extends UiHandler {
 
   override setCursor(cursor: number): boolean {
     const changed = super.setCursor(cursor);
+    const count = this.config?.options.length ?? 0;
+    const focus = cursor < count ? cursor : this.config?.onReroll && cursor < count * 2 ? cursor - count : -1;
     this.borders.forEach((border, index) =>
-      border.setStrokeStyle(index === cursor ? 2 : 1, index === cursor ? 0xf4d68b : 0x52647d),
+      border.setStrokeStyle(index === focus ? 2 : 1, index === focus ? 0xf4d68b : 0x52647d),
     );
-    this.partyText?.setColor(cursor === this.config?.options.length ? "#f4d68b" : "#bdc8d8");
+    this.rerollButtons.forEach((button, index) =>
+      button.background.setFillStyle(cursor === count + index ? 0x34435c : 0x152031),
+    );
+    this.partyText?.setColor(cursor === count * (this.config?.onReroll ? 2 : 1) ? "#f4d68b" : "#bdc8d8");
     return changed;
   }
 
   private choose(): boolean {
+    if (
+      this.config?.onReroll
+      && this.cursor >= this.config.options.length
+      && this.cursor < this.config.options.length * 2
+    ) {
+      return this.reroll(this.cursor - this.config.options.length);
+    }
     if (!this.active || this.accepted || !this.config || !this.inputGate.confirm(performance.now())) {
       return false;
     }
     this.getUi().playSelect();
-    if (this.cursor === this.config.options.length) {
+    if (this.cursor === this.config.options.length * (this.config.onReroll ? 2 : 1)) {
       this.root.setVisible(false);
       this.config.onParty?.();
     } else {
@@ -217,6 +265,7 @@ export class ForgeDraftUiHandler extends UiHandler {
       return false;
     }
     const count = this.config.options.length;
+    const party = count * (this.config.onReroll ? 2 : 1);
     if (button === Button.ACTION || button === Button.SUBMIT) {
       return this.choose();
     }
@@ -225,11 +274,20 @@ export class ForgeDraftUiHandler extends UiHandler {
     }
     if (button === Button.LEFT || button === Button.RIGHT) {
       const direction = button === Button.LEFT ? -1 : 1;
-      this.setCursor((Math.min(this.cursor, count - 1) + direction + count) % count);
+      const row = this.config.onReroll && this.cursor >= count && this.cursor < count * 2 ? count : 0;
+      this.setCursor(row + (((this.cursor % count) + direction + count) % count));
+    } else if ((button === Button.DOWN || button === Button.UP) && this.config.onReroll) {
+      if (this.cursor === party && this.config.onParty) {
+        this.setCursor(button === Button.UP ? count : 0);
+      } else if (this.cursor < count) {
+        this.setCursor(button === Button.DOWN || !this.config.onParty ? this.cursor + count : party);
+      } else {
+        this.setCursor(button === Button.UP || !this.config.onParty ? this.cursor - count : party);
+      }
     } else if ((button === Button.DOWN || button === Button.UP || button === Button.CANCEL) && this.config.onParty) {
-      this.setCursor(this.cursor === count ? 0 : count);
+      this.setCursor(this.cursor === party ? 0 : party);
     } else if (button === Button.STATS && this.config.onParty) {
-      this.setCursor(count);
+      this.setCursor(party);
       this.choose();
     } else {
       return false;
@@ -252,6 +310,24 @@ export class ForgeDraftUiHandler extends UiHandler {
 
   private animate(config: Phaser.Types.Tweens.TweenBuilderConfig): void {
     this.animations.push(globalScene.tweens.add(config));
+  }
+
+  private reroll(index: number): boolean {
+    if (
+      !this.active
+      || this.accepted
+      || !this.config?.onReroll
+      || !this.config.rerollsRemaining?.[index]
+      || !this.inputGate.confirm(performance.now())
+    ) {
+      return false;
+    }
+    if (!this.config.onReroll(index)) {
+      return false;
+    }
+    this.getUi().playSelect();
+    this.show([this.config, index]);
+    return true;
   }
 
   private stopAnimations(): void {

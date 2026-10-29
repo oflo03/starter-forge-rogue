@@ -9,6 +9,7 @@ import { initMoveAnim } from "#data/battle-anims";
 import { allMoves } from "#data/data-lists";
 import { getLevelTotalExp } from "#data/exp";
 import { CustomPokemonData } from "#data/pokemon-data";
+import { AbilityId } from "#enums/ability-id";
 import { Button } from "#enums/buttons";
 import { ModifierTier } from "#enums/modifier-tier";
 import { MoveCategory } from "#enums/move-category";
@@ -29,13 +30,14 @@ import i18next from "i18next";
 import { evolutionStats } from "../../forge/stats.ts";
 import Maker from "../../forge/vendor/engine.js";
 import { forgeAppearance, forgeTypeChoice } from "./appearance";
+import { AUGMENT_REROLLS, type AugmentTier, rollAugmentTier } from "./augments";
 import { DraftInputGate } from "./draft-input";
 import { animateForgeEvolution } from "./evolution";
 import { FORGE_ABILITY_LEVELS, FORGE_MILESTONES, FORGE_MOVE_LEVELS } from "./progression";
 import {
+  abilityAugmentChoices,
   customAbilityChoices,
   customMoveChoices,
-  customPassiveChoices,
   starterAbility,
   starterMoves,
 } from "./registry";
@@ -211,22 +213,54 @@ async function chooseList(title: string, options: { name: string; description?: 
     );
   });
 }
-function rewardTier(seed: string): ModifierTier {
-  const n = Maker.createRng(globalScene.seed + ":reward:" + seed).int(1, 100);
-  return n <= 65 ? ModifierTier.COMMON : n <= 90 ? ModifierTier.GREAT : ModifierTier.ULTRA;
+function rewardTier(seed: string): AugmentTier {
+  return rollAugmentTier(globalScene.seed + ":reward:" + seed);
 }
-async function chooseCards(title: string, options: ForgeDraftOption[], seed: string): Promise<any> {
+async function chooseCards(
+  title: string,
+  options: ForgeDraftOption[],
+  seed: string,
+  regenerate?: (seed: string, excludedValues: any[]) => ForgeDraftOption[],
+): Promise<any> {
   const ui = globalScene.ui;
   const previousMenuState = globalScene.disableMenu;
   globalScene.disableMenu = true;
   ui.clearText();
   try {
     return await new Promise(resolve => {
+      const remaining = options.map(() => AUGMENT_REROLLS);
+      const history = options.map(option => option.value);
+      const key = (value: any) => value?.id ?? value;
       const show = () => ui.setMode(UiMode.FORGE_DRAFT, config);
       const config: ForgeDraftConfig = {
         title,
         options,
-        tier: rewardTier(seed.split(":tier:")[0]),
+        tier: [ModifierTier.COMMON, ModifierTier.GREAT, ModifierTier.ULTRA][rewardTier(seed.split(":tier:")[0])],
+        ...(regenerate
+          ? {
+              rerollsRemaining: remaining,
+              onReroll: (index: number) => {
+                if (remaining[index] <= 0) {
+                  return false;
+                }
+                const rollSeed = `${seed}:reroll:${index}:${AUGMENT_REROLLS - remaining[index] + 1}`;
+                const current = new Set(options.map(option => key(option.value)));
+                const candidate =
+                  regenerate(rollSeed, history).find(option => !current.has(key(option.value)))
+                  ?? regenerate(
+                    rollSeed,
+                    options.map(option => option.value),
+                  ).find(option => !current.has(key(option.value)));
+                if (!candidate) {
+                  return false;
+                }
+                options[index] = candidate;
+                history.push(candidate.value);
+                remaining[index]--;
+                return true;
+              },
+            }
+          : {}),
         onChoose: index => {
           ui.setMode(UiMode.MESSAGE).then(() => resolve(options[index].value));
         },
@@ -250,6 +284,16 @@ function moveDescription(id: MoveId): string {
   return `${typeName(move.type)} · ${category} · 위력 ${move.power} · 명중 ${accuracy} · PP ${move.pp}${priority}\n${move.effect}`;
 }
 function enhancedCategory(pokemon: PlayerPokemon, stats: number[]): MoveCategory | undefined {
+  const nativeCategory = (id: AbilityId) =>
+    [AbilityId.HUGE_POWER, AbilityId.MOXIE].includes(id)
+      ? MoveCategory.PHYSICAL
+      : id === AbilityId.SOUL_HEART
+        ? MoveCategory.SPECIAL
+        : undefined;
+  const activeCategory = nativeCategory(pokemon.getAbility(true).id);
+  if (activeCategory !== undefined) {
+    return activeCategory;
+  }
   const choice = [
     ...customAbilityChoices(growthTypes(pokemon), stats, "category"),
     ...[1, 2, 3, 4].flatMap(tier => customAbilityChoices(growthTypes(pokemon), stats, "category", tier)),
@@ -257,7 +301,9 @@ function enhancedCategory(pokemon: PlayerPokemon, stats: number[]): MoveCategory
   if (choice?.name === "밸런스기어" || choice?.name.startsWith("빈틈없는박자")) {
     return pokemon.stats[1] <= pokemon.stats[3] ? MoveCategory.PHYSICAL : MoveCategory.SPECIAL;
   }
-  return choice?.enhancedCategory;
+  return (
+    choice?.enhancedCategory ?? (pokemon.hasPassive() ? nativeCategory(pokemon.getPassiveAbility().id) : undefined)
+  );
 }
 export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number): Promise<void> {
   const data = pokemon.customPokemonData.forge;
@@ -302,19 +348,17 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
         await animateForgeEvolution(pokemon, 2, evolutionStats(stats, 2));
       }
       if (FORGE_MOVE_LEVELS.includes(level)) {
-        const options = customMoveChoices(
-          growthTypes(pokemon),
-          stats,
-          seed,
-          pokemon.getMoveset(true).map(m => m.moveId),
-          enhancedCategory(pokemon, stats),
-          level,
-        );
-        const id: MoveId = await chooseCards(
-          `${name} · Lv.${level} · 기술`,
-          options.map(o => ({ name: o.name, description: moveDescription(o.id), value: o.id, moveId: o.id })),
-          seed,
-        );
+        const makeOptions = (rollSeed: string, excluded: any[] = []) =>
+          customMoveChoices(
+            growthTypes(pokemon),
+            stats,
+            rollSeed,
+            [...pokemon.getMoveset(true).map(m => m.moveId), ...excluded],
+            enhancedCategory(pokemon, stats),
+            level,
+            rarity,
+          ).map(o => ({ name: o.name, description: moveDescription(o.id), value: o.id, moveId: o.id }));
+        const id: MoveId = await chooseCards(`${name} · Lv.${level} · 기술`, makeOptions(seed), seed, makeOptions);
         let slot = pokemon.getMoveset(true).length;
         if (slot >= 4) {
           const category = enhancedCategory(pokemon, stats);
@@ -347,18 +391,13 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
         }
       } else if (FORGE_ABILITY_LEVELS.includes(level)) {
         const passive = level === 26;
-        const options = passive
-          ? customPassiveChoices(growthTypes(pokemon), stats, seed)
-          : customAbilityChoices(growthTypes(pokemon), stats, seed);
-        const choice = await chooseCards(
-          `${name} · ${passive ? "패시브" : "특성"}`,
-          options.map(o => ({
-            name: o.name,
-            description: o.description,
-            value: o,
-          })),
-          seed,
-        );
+        const equipped = [pokemon.customPokemonData.ability, pokemon.customPokemonData.passive].filter(id => id >= 0);
+        const makeOptions = (rollSeed: string, excluded: any[] = []) =>
+          abilityAugmentChoices(growthTypes(pokemon), stats, rollSeed, rarity, [
+            ...equipped,
+            ...excluded.map(value => value.id),
+          ]).map(o => ({ name: o.name, description: o.description, value: o }));
+        const choice = await chooseCards(`${name} · 특성`, makeOptions(seed), seed, makeOptions);
         if (passive) {
           pokemon.customPokemonData.passive = choice.id;
           pokemon.passive = true;

@@ -180,7 +180,7 @@ describe("Forge original engine registry", () => {
 
   it("registers both flinch variants for every type with the original flinch attribute", () => {
     const customFlinches = allMoves.filter(move => MoveId[move.id] === undefined && move.hasAttr("FlinchAttr"));
-    expect(customFlinches).toHaveLength(36 * 5);
+    expect(customFlinches).toHaveLength(36 * 5 * 3);
     for (let type = PokemonType.NORMAL; type <= PokemonType.FAIRY; type++) {
       const variants = customFlinches.slice(0, 36).filter(move => move.type === type);
       expect(variants).toHaveLength(2);

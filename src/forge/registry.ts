@@ -36,6 +36,7 @@ import {
   TerrainChangeAttr,
   WeatherChangeAttr,
 } from "#moves/move";
+import { AugmentTier } from "./augments";
 import { FORGE_TERRAINS, FORGE_WEATHERS } from "./environment";
 
 /** Attack setters still deal damage when the same environment is already active. */
@@ -134,7 +135,8 @@ const starterAbilities = new Map<PokemonType, AbilityId>([
   [PokemonType.GRASS, AbilityId.OVERGROW],
   [PokemonType.BUG, AbilityId.SWARM],
 ]);
-const registeredMoves: (ForgeMoveChoice & { source: CatalogMove; rewardStage: number })[] = [];
+const registeredMoves: (ForgeMoveChoice & { source: CatalogMove; rewardStage: number; augmentTier?: AugmentTier })[] =
+  [];
 const registeredAbilities = new Map<string, ForgeAbilityChoice>();
 const registeredPassives: (ForgeAbilityChoice & {
   affinity: readonly PokemonType[];
@@ -452,7 +454,56 @@ export function initializeForgeRegistry(): void {
     }
   }
   initializeEnvironmentRewards();
+  initializeGradedMoves();
   initialized = true;
+}
+
+/** Append variants, preserving every previously saved numeric move ID. */
+function initializeGradedMoves(): void {
+  for (const choice of [...registeredMoves]) {
+    const original = allMoves[choice.id];
+    for (const tier of [AugmentTier.SILVER, AugmentTier.PRISMATIC]) {
+      const factor = tier === AugmentTier.SILVER ? 0.85 : 1.2;
+      const power = Math.min(
+        choice.source.alwaysCrit ? 70 : 240,
+        Math.max(5, Math.round((original.power * factor) / 5) * 5),
+      );
+      const chance =
+        original.chance > 0 && original.chance < 100
+          ? Math.min(100, Math.max(1, Math.round(original.chance * (tier === AugmentTier.SILVER ? 0.75 : 1.25))))
+          : original.chance;
+      const description = chance === original.chance ? original.effect : original.effect.replace(/\d+%/, `${chance}%`);
+      const move = Object.assign(
+        new AttackMove(
+          MoveId.TACKLE,
+          original.type,
+          original.category,
+          power,
+          original.accuracy,
+          original.pp,
+          chance,
+          original.priority,
+          9,
+        ),
+        original,
+      );
+      move.id = allMoves.length as MoveId;
+      move.power = power;
+      move.chance = chance;
+      move.pp = original.pp + (tier === AugmentTier.PRISMATIC ? 5 : 0);
+      // Reuse the base move's effects; only power, PP and chance differ.
+      Object.defineProperty(move, "localize", {
+        value: () => {
+          move.name = choice.name;
+          move.effect = description;
+        },
+      });
+      Object.defineProperty(move, "forgeAnimation", { value: MoveId.TACKLE });
+      move.localize();
+      (allMoves as Move[]).push(move);
+      registeredMoves.push({ ...choice, id: move.id, power, description, augmentTier: tier });
+    }
+  }
 }
 
 export function starterAbility(type: PokemonType): AbilityId {
@@ -568,6 +619,75 @@ export function customPassiveChoices(types: PokemonType[], stats: Stats, seed: s
   return seededOrder(choices, `${seed}:passives`);
 }
 
+const originalAugmentAbilities: Record<AugmentTier, AbilityId[]> = {
+  [AugmentTier.SILVER]: [
+    AbilityId.BATTLE_ARMOR,
+    AbilityId.INNER_FOCUS,
+    AbilityId.OWN_TEMPO,
+    AbilityId.LIMBER,
+    AbilityId.IMMUNITY,
+    AbilityId.INSOMNIA,
+    AbilityId.EARLY_BIRD,
+    AbilityId.KEEN_EYE,
+    AbilityId.STURDY,
+    AbilityId.SUPER_LUCK,
+    AbilityId.THICK_FAT,
+    AbilityId.COMPOUND_EYES,
+    AbilityId.PRESSURE,
+    AbilityId.SYNCHRONIZE,
+  ],
+  [AugmentTier.GOLD]: [
+    AbilityId.MOXIE,
+    AbilityId.SOUL_HEART,
+    AbilityId.BEAST_BOOST,
+    AbilityId.SPEED_BOOST,
+    AbilityId.SERENE_GRACE,
+    AbilityId.REGENERATOR,
+    AbilityId.MAGIC_GUARD,
+    AbilityId.MULTISCALE,
+    AbilityId.INTIMIDATE,
+    AbilityId.DOWNLOAD,
+    AbilityId.UNAWARE,
+    AbilityId.ADAPTABILITY,
+    AbilityId.FILTER,
+    AbilityId.TINTED_LENS,
+    AbilityId.NO_GUARD,
+    AbilityId.LEVITATE,
+  ],
+  [AugmentTier.PRISMATIC]: [
+    AbilityId.HUGE_POWER,
+    AbilityId.FUR_COAT,
+    AbilityId.ICE_SCALES,
+    AbilityId.PARENTAL_BOND,
+    AbilityId.GOOD_AS_GOLD,
+    AbilityId.FLUFFY,
+  ],
+};
+
+/** Both native slots draw from exactly the same curated original/custom pool. */
+export function abilityAugmentChoices(
+  types: PokemonType[],
+  stats: Stats,
+  seed: string,
+  tier: AugmentTier,
+  excluded: readonly AbilityId[] = [],
+): ForgeAbilityChoice[] {
+  initializeForgeRegistry();
+  const originals = originalAugmentAbilities[tier].map(id => ({
+    id,
+    name: allAbilities[id].name,
+    description: allAbilities[id].description,
+  }));
+  const environment = registeredPassives.filter(choice => {
+    const high = ["먹구름부름", "화이트메이커", "스왐프메이커"].includes(choice.name);
+    return tier === (high ? AugmentTier.PRISMATIC : AugmentTier.GOLD);
+  });
+  const custom = tier === AugmentTier.PRISMATIC ? customAbilityChoices(types, stats, seed) : [];
+  const pool = [...originals, ...environment, ...custom].filter(choice => !excluded.includes(choice.id));
+  const ordered = seededOrder(pool, `${seed}:unified-abilities`);
+  return ordered.slice(0, 3);
+}
+
 function seededOrder<T>(items: T[], seed: string): T[] {
   const random = Maker.createRng(seed);
   const result = [...items];
@@ -585,6 +705,7 @@ export function customMoveChoices(
   excludedIds: readonly MoveId[] = [],
   preferredCategory?: MoveCategory,
   rewardLevel = 11,
+  augmentTier = AugmentTier.GOLD,
 ): ForgeMoveChoice[] {
   initializeForgeRegistry();
   const [attack, special] = statsPair(stats);
@@ -596,6 +717,7 @@ export function customMoveChoices(
     move =>
       types.includes(move.type)
       && move.rewardStage === rewardStage
+      && (move.augmentTier ?? AugmentTier.GOLD) === augmentTier
       && !excludedIds.includes(move.id)
       && !learnedFamilies.has(move.source.id)
       && (!move.source.alwaysCrit
@@ -649,7 +771,7 @@ export function customMoveChoices(
       choices[keepsSecondary ? 1 : choices.length - 1] = environment;
     }
   }
-  return choices.map(({ source: _source, rewardStage: _stage, ...choice }) => choice);
+  return choices.map(({ source: _source, rewardStage: _stage, augmentTier: _tier, ...choice }) => choice);
 }
 
 export function customAbilityChoices(
