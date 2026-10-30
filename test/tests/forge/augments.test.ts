@@ -15,12 +15,29 @@ describe("Forge augment grades and shared ability pool", () => {
   it("publishes every current creative move family with actual registered combat values", () => {
     const catalog = forgeMoveCatalog();
     expect(new Set(catalog.map(move => `${move.name}:${move.type}:${move.category}`)).size).toBe(222);
-    expect([...new Set(catalog.map(move => move.rewardLevel))].sort((a, b) => a - b)).toEqual([11, 31, 51]);
+    expect(catalog).toHaveLength(222 * 3);
+    expect(new Set(catalog.map(move => `${move.name}:${move.type}:${move.category}:${move.augmentTier}`)).size).toBe(
+      catalog.length,
+    );
     expect(new Set(catalog.map(move => move.id)).size).toBe(catalog.length);
     for (const move of catalog) {
       expect(move.power).toBe(allMoves[move.id].power);
       expect(move.pp).toBe(allMoves[move.id].pp);
       expect(move.description).toBe(allMoves[move.id].effect);
+    }
+  });
+  it("offers the same move IDs, effects and powers at every reward level", () => {
+    for (let type = PokemonType.NORMAL; type <= PokemonType.FAIRY; type++) {
+      for (const tier of [AugmentTier.SILVER, AugmentTier.GOLD, AugmentTier.PRISMATIC]) {
+        const first = customMoveChoices([type], stats, "fixed-level", [], undefined, 11, tier);
+        for (const level of [31, 51]) {
+          expect(customMoveChoices([type], stats, "fixed-level", [], undefined, level, tier)).toEqual(first);
+        }
+        const learned = first.map(move => move.id);
+        const later = customMoveChoices([type], stats, "fixed-level", learned, undefined, 51, tier);
+        expect(later).toHaveLength(3);
+        expect(later.every(move => !learned.includes(move.id))).toBe(true);
+      }
     }
   });
   it("keeps ability-only levels and preserves both legacy and newly earned slot rewards", () => {

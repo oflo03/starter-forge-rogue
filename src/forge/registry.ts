@@ -964,19 +964,18 @@ export function customMoveChoices(
   seed: string,
   excludedIds: readonly MoveId[] = [],
   preferredCategory?: MoveCategory,
-  rewardLevel = 11,
+  _rewardLevel = 11,
   augmentTier = AugmentTier.GOLD,
 ): ForgeMoveChoice[] {
   initializeForgeRegistry();
   const [attack, special] = statsPair(stats);
-  const rewardStage = Math.max(0, Math.min(4, Math.floor((rewardLevel - 11) / 10)));
   const learnedFamilies = new Set(
     registeredMoves.filter(move => excludedIds.includes(move.id)).map(move => move.source.id),
   );
   const candidates = registeredMoves.filter(
     move =>
       types.includes(move.type)
-      && move.rewardStage === rewardStage
+      && move.rewardStage === (["weather", "terrain"].includes(move.source.templateId) ? 2 : 0)
       && (move.augmentTier ?? AugmentTier.GOLD) === augmentTier
       && !excludedIds.includes(move.id)
       && !learnedFamilies.has(move.source.id)
@@ -991,7 +990,7 @@ export function customMoveChoices(
   ];
   const choices: typeof ordered = [];
   for (const predicate of [
-    (move: (typeof ordered)[number]) => move.power >= 100 || (move.source.templateId === "strike" && rewardStage >= 3),
+    (move: (typeof ordered)[number]) => move.power >= 100,
     (move: (typeof ordered)[number]) => ["drain", "siphon", "erode", "crush", "beam"].includes(move.source.templateId),
     (move: (typeof ordered)[number]) =>
       move.source.priority > 0
@@ -1020,28 +1019,27 @@ export function customMoveChoices(
       choices[choices.length - 1] = secondary;
     }
   }
-  if (rewardStage >= 2) {
-    const environment = ordered.find(move => ["weather", "terrain"].includes(move.source.templateId));
-    if (environment && !choices.some(move => move.id === environment.id)) {
-      const keepsSecondary =
-        types.length > 1
-        && environment.type !== types[1]
-        && choices.at(-1)?.type === types[1]
-        && !choices.slice(0, -1).some(move => move.type === types[1]);
-      choices[keepsSecondary ? 1 : choices.length - 1] = environment;
-    }
+  const environment = ordered.find(move => ["weather", "terrain"].includes(move.source.templateId));
+  if (environment && !choices.some(move => move.id === environment.id)) {
+    const keepsSecondary =
+      types.length > 1
+      && environment.type !== types[1]
+      && choices.at(-1)?.type === types[1]
+      && !choices.slice(0, -1).some(move => move.type === types[1]);
+    choices[keepsSecondary ? 1 : choices.length - 1] = environment;
   }
   return choices.map(({ source: _source, rewardStage: _stage, augmentTier: _tier, ...choice }) => choice);
 }
 
-/** Current reward variants for the public catalog, excluding legacy-only levels. */
+/** One fixed version per family and grade; old level variants remain save-compatible only. */
 export function forgeMoveCatalog() {
   initializeForgeRegistry();
   return registeredMoves
-    .filter(move => [0, 2, 4].includes(move.rewardStage))
-    .map(({ source: _source, rewardStage, ...move }) => ({
+    .filter(move => move.rewardStage === (["weather", "terrain"].includes(move.source.templateId) ? 2 : 0))
+    .map(({ source, rewardStage: _rewardStage, ...move }) => ({
       ...move,
-      rewardLevel: 11 + rewardStage * 10,
+      templateId: source.templateId,
+      alwaysCrit: source.alwaysCrit ?? false,
       augmentTier: move.augmentTier ?? AugmentTier.GOLD,
       accuracy: allMoves[move.id].accuracy,
       pp: allMoves[move.id].pp,

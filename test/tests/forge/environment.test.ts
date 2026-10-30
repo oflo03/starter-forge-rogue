@@ -248,7 +248,7 @@ describe("Forge native environments and reward slots", () => {
     expect(mon.summonData.forgeSwampCount).toBe(5);
   });
 
-  it("provides stronger late moves, environment attacks and capped single-hit criticals", () => {
+  it("provides fixed moves, environment attacks and capped single-hit criticals at all levels", () => {
     for (const level of [11, 21, 31, 41, 51]) {
       for (const definition of FORGE_WEATHERS) {
         const choices = customMoveChoices(
@@ -279,6 +279,6 @@ describe("Forge native environments and reward slots", () => {
     }
     const early = customMoveChoices([PokemonType.FIRE], stats, "strong", [], undefined, 11);
     const late = customMoveChoices([PokemonType.FIRE], stats, "strong", [], undefined, 51);
-    expect(Math.max(...late.map(move => move.power))).toBeGreaterThan(Math.max(...early.map(move => move.power)));
+    expect(late).toEqual(early);
   });
 });
