@@ -18,9 +18,9 @@ import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
 import type { PlayerPokemon } from "#field/pokemon";
+import { PokemonMove } from "#moves/pokemon-move";
 import { NumberHolder } from "#utils/common";
 import { describe, expect, it } from "vitest";
-import Catalog from "../../../forge/vendor/catalog.js";
 
 describe("Forge original engine registry", () => {
   it("preserves five-level reward history when copying evolution and save data", () => {
@@ -77,12 +77,9 @@ describe("Forge original engine registry", () => {
         expect(customMoveChoices([type], stats, "reward-fixture")).toEqual(moves);
         for (const choice of moves) {
           const move = allMoves[choice.id];
-          expect(move.type).toBe(type);
+          expect(MoveId[move.id]).toBeDefined();
           expect(move.name).toBe(choice.name);
           expect(move.is(move.category === MoveCategory.STATUS ? "StatusMove" : "AttackMove")).toBe(true);
-          expect([MoveId.TACKLE, MoveId.RAIN_DANCE, MoveId.MISTY_TERRAIN]).toContain(
-            (move as unknown as { forgeAnimation: MoveId }).forgeAnimation,
-          );
         }
         const abilities = customAbilityChoices([type], stats, "reward-fixture");
         expect(abilities).toHaveLength(3);
@@ -96,9 +93,9 @@ describe("Forge original engine registry", () => {
     }
   });
 
-  it("includes a secondary type option and only original move attributes", () => {
+  it("allows off-type coverage while retaining original combat data", () => {
     const moves = customMoveChoices([PokemonType.FIRE, PokemonType.WATER], [90, 120, 80, 60, 80, 100], "dual-fixture");
-    expect(moves.some(move => move.type === PokemonType.WATER)).toBe(true);
+    expect(moves.some(move => ![PokemonType.FIRE, PokemonType.WATER].includes(move.type))).toBe(true);
     for (const choice of moves) {
       const registered = allMoves[choice.id];
       registered.localize();
@@ -180,35 +177,13 @@ describe("Forge original engine registry", () => {
     }
   });
 
-  it("registers both flinch variants for every type with the original flinch attribute", () => {
-    const customFlinches = allMoves.filter(move => MoveId[move.id] === undefined && move.hasAttr("FlinchAttr"));
-    expect(customFlinches).toHaveLength(36 * 5 * 3);
-    for (let type = PokemonType.NORMAL; type <= PokemonType.FAIRY; type++) {
-      const variants = customFlinches.slice(0, 36).filter(move => move.type === type);
-      expect(variants).toHaveLength(2);
-      expect(variants.find(move => move.category === MoveCategory.PHYSICAL)?.chance).toBe(30);
-      expect(variants.find(move => move.category === MoveCategory.SPECIAL)?.chance).toBe(20);
-      for (const move of variants) {
-        const template = move.category === MoveCategory.PHYSICAL ? "flinch" : "special-flinch";
-        const source = Catalog.getLibrary().moves.find(
-          m => m.templateId === template && m.type === PokemonType[type].toLowerCase(),
-        );
-        expect(move.power).toBe(Math.max(source.power, move.category === MoveCategory.PHYSICAL ? 80 : 75));
-        expect(move.accuracy).toBe(source.accuracy);
-        expect(move.pp).toBe(source.pp);
-        expect(move.priority).toBe(source.priority);
-      }
-    }
-  });
-
-  it("offers distinct burst, utility and tempo choices and respects a chosen attack category", () => {
-    for (let type = 0; type < 18; type++) {
-      const choices = customMoveChoices([type], [90, 120, 80, 60, 80, 100], "strong-reward", [], MoveCategory.SPECIAL);
-      expect(choices).toHaveLength(3);
-      expect(choices.some(move => move.power >= 100)).toBe(true);
-      expect(choices.filter(move => move.category === MoveCategory.SPECIAL).length).toBeGreaterThanOrEqual(2);
-      expect(new Set(choices.map(move => move.id)).size).toBe(3);
-    }
+  it("migrates saved creative attack slots into valid original moves", () => {
+    const legacy = allMoves.findIndex((move, index) => index !== move.id && MoveId[move.id] !== undefined);
+    expect(legacy).toBeGreaterThan(MoveId.MALIGNANT_CHAIN);
+    const saved = PokemonMove.loadMove({ moveId: legacy, ppUsed: 2, ppUp: 0 });
+    expect(MoveId[saved.moveId]).toBeDefined();
+    expect(saved.getMove()).toBe(allMoves[saved.moveId]);
+    expect(saved.ppUsed).toBe(2);
   });
 
   it("offers stronger awakenings as new IDs and preserves core ability identities", () => {
@@ -240,29 +215,22 @@ describe("Forge original engine registry", () => {
       expect(damage.value).toBeCloseTo([0, 165, 180, 195, 210][tier]);
     }
   });
-  it("reuses valid original animations on first load, repeated load and saved move asset reload", async () => {
+  it("uses the original move animation cache for rewards and saved reloads", async () => {
     const id = customMoveChoices([PokemonType.FIRE], [90, 100, 80, 100, 80, 80], "animation-test")[0].id;
-    const oldOriginal = moveAnims.get(MoveId.TACKLE);
-    const oldCustom = moveAnims.get(id);
-    const original = new AnimConfig({ id: MoveId.TACKLE, frames: [], frameTimedEvents: {} });
-    moveAnims.set(MoveId.TACKLE, original);
-    moveAnims.delete(id);
+    const old = moveAnims.get(id);
+    const animation = new AnimConfig({ id, frames: [], frameTimedEvents: {} });
+    moveAnims.set(id, animation);
     try {
       for (let repeat = 0; repeat < 3; repeat++) {
         await initMoveAnim(id);
-        expect(moveAnims.get(id)).toBe(original);
+        expect(moveAnims.get(id)).toBe(animation);
         await expect(loadMoveAnimAssets([id])).resolves.toBeUndefined();
       }
     } finally {
-      if (oldOriginal === undefined) {
-        moveAnims.delete(MoveId.TACKLE);
-      } else {
-        moveAnims.set(MoveId.TACKLE, oldOriginal);
-      }
-      if (oldCustom === undefined) {
+      if (old === undefined) {
         moveAnims.delete(id);
       } else {
-        moveAnims.set(id, oldCustom);
+        moveAnims.set(id, old);
       }
     }
   });

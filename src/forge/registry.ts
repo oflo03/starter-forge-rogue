@@ -54,6 +54,8 @@ import {
   forgeLightningFollowup,
   forgePaintBoost,
 } from "./environment-abilities";
+import { FORGE_NATIVE_MOVE_TIERS } from "./move-rewards";
+import { abilityRewardWeight, type ForgeBuildContext, moveRewardWeight, weightedRewardOrder } from "./reward-synergy";
 
 export interface ForgeMoveChoice {
   id: MoveId;
@@ -178,6 +180,7 @@ export function initializeForgeRegistry(): void {
         description,
       );
       starterAbilities.set(type as PokemonType, choice.id);
+      Object.defineProperty(allAbilities[choice.id], "forgeBoostedType", { value: type });
     }
   }
   const rewardDescriptions: Record<string, string> = {
@@ -490,7 +493,34 @@ export function initializeForgeRegistry(): void {
     forgeEnvironmentBenefitIds.set(definition.key, ability.id);
     registeredEnvironmentBenefits.push({ ...ability, tier: definition.tier });
   }
+  migrateRetiredMoveDefinitions();
   initialized = true;
+}
+
+/** Retain numeric slots for old saves, but retire their creative names and effects. */
+function migrateRetiredMoveDefinitions(): void {
+  const nativeIds = Object.values(FORGE_NATIVE_MOVE_TIERS).flat();
+  for (const choice of registeredMoves) {
+    if (choice.category === MoveCategory.STATUS) {
+      continue;
+    }
+    const sameCategory = nativeIds.filter(id => allMoves[id].category === choice.category);
+    const sameType = sameCategory.filter(id => allMoves[id].type === choice.type);
+    const candidates = sameType.length > 0 ? sameType : sameCategory;
+    const expectedAttr = ["drain", "siphon"].includes(choice.source.templateId)
+      ? "HitHealAttr"
+      : choice.source.templateId.includes("flinch")
+        ? "FlinchAttr"
+        : undefined;
+    const cost = (id: MoveId) =>
+      Math.abs(allMoves[id].power - choice.source.power)
+      + (expectedAttr && !allMoves[id].hasAttr(expectedAttr) ? 50 : 0);
+    const replacement = [...candidates].sort((a, b) => cost(a) - cost(b) || a - b)[0];
+    if (replacement === undefined) {
+      throw new Error("Missing native replacement for retired move.");
+    }
+    (allMoves as Move[])[choice.id] = allMoves[replacement];
+  }
 }
 
 /** Append variants, preserving every previously saved numeric move ID. */
@@ -931,6 +961,7 @@ export function abilityAugmentChoices(
   seed: string,
   tier: AugmentTier,
   excluded: readonly AbilityId[] = [],
+  context?: ForgeBuildContext,
 ): ForgeAbilityChoice[] {
   initializeForgeRegistry();
   const originals = originalAugmentAbilities[tier]
@@ -943,7 +974,9 @@ export function abilityAugmentChoices(
   const environment = tier === AugmentTier.GOLD ? registeredPassives : [];
   const benefits = registeredEnvironmentBenefits.filter(choice => choice.tier === tier);
   const pool = [...originals, ...environment, ...benefits].filter(choice => !excluded.includes(choice.id));
-  const ordered = seededOrder(pool, `${seed}:unified-abilities`);
+  const ordered = weightedRewardOrder(pool, `${seed}:unified-abilities`, choice =>
+    abilityRewardWeight(choice.id, context),
+  );
   return ordered.slice(0, 3);
 }
 
@@ -969,104 +1002,58 @@ export function customMoveChoices(
   preferredCategory?: MoveCategory,
   _rewardLevel = 11,
   augmentTier = AugmentTier.GOLD,
+  context?: ForgeBuildContext,
 ): ForgeMoveChoice[] {
   initializeForgeRegistry();
+  const known = new Set(excludedIds.map(id => allMoves[id]?.id ?? id));
   const [attack, special] = statsPair(stats);
-  const learnedFamilies = new Set(
-    registeredMoves.filter(move => excludedIds.includes(move.id)).map(move => moveFamily(move.source)),
-  );
-  const candidates = registeredMoves.filter(
-    move =>
-      types.includes(move.type)
-      && move.rewardStage === (["weather", "terrain"].includes(move.source.templateId) ? 2 : 0)
-      && (move.category !== MoveCategory.STATUS || move.source.id.endsWith(`-${MoveCategory.PHYSICAL}`))
-      && (move.category === MoveCategory.STATUS
-        ? augmentTier === AugmentTier.SILVER && move.augmentTier === undefined
-        : (move.augmentTier ?? AugmentTier.GOLD) === augmentTier)
-      && !excludedIds.includes(move.id)
-      && !learnedFamilies.has(moveFamily(move.source))
-      && (!move.source.alwaysCrit
-        || (move.power <= 70 && (move.category === MoveCategory.PHYSICAL ? attack : special) <= 110)),
-  );
-  const shuffled = seededOrder(candidates, `${seed}:moves`);
   const preferred = preferredCategory ?? (attack >= special ? MoveCategory.PHYSICAL : MoveCategory.SPECIAL);
-  const ordered = [
-    ...shuffled.filter(move => move.category === preferred),
-    ...shuffled.filter(move => move.category !== preferred),
-  ];
-  const choices: typeof ordered = [];
-  for (const predicate of [
-    (move: (typeof ordered)[number]) => move.power >= 100,
-    (move: (typeof ordered)[number]) => ["drain", "siphon", "erode", "crush", "beam"].includes(move.source.templateId),
-    (move: (typeof ordered)[number]) =>
-      move.source.priority > 0
-      || move.source.templateId === "sure"
-      || move.source.templateId === "critical"
-      || move.source.templateId.includes("flinch"),
-  ]) {
-    const candidate = ordered.find(
-      move => predicate(move) && !choices.some(other => other.source.templateId === move.source.templateId),
-    );
-    if (candidate) {
-      choices.push(candidate);
-    }
-  }
-  for (const candidate of ordered) {
-    if (choices.length === 3) {
-      break;
-    }
-    if (!choices.some(move => move.id === candidate.id)) {
-      choices.push(candidate);
-    }
-  }
-  if (types.length > 1 && !choices.some(move => move.type === types[1])) {
-    const secondary = ordered.find(move => move.type === types[1]);
-    if (secondary) {
-      choices[choices.length - 1] = secondary;
-    }
-  }
-  const environment = ordered.find(move => ["weather", "terrain"].includes(move.source.templateId));
-  if (environment && !choices.some(move => move.id === environment.id)) {
-    const keepsSecondary =
-      types.length > 1
-      && environment.type !== types[1]
-      && choices.at(-1)?.type === types[1]
-      && !choices.slice(0, -1).some(move => move.type === types[1]);
-    const otherCategory = choices.findIndex(
-      (move, index) => move.category !== preferred && !(keepsSecondary && index === choices.length - 1),
-    );
-    const index = otherCategory >= 0 ? otherCategory : keepsSecondary ? 1 : choices.length - 1;
-    const keepsBurst =
-      choices[index].power < 100 || choices.some((move, other) => other !== index && move.power >= 100);
-    if (
-      keepsBurst
-      && (preferredCategory === undefined
-        || choices[index].category !== preferred
-        || choices.filter(move => move.category === preferred).length > 2)
-    ) {
-      choices[index] = environment;
-    }
-  }
-  return choices.map(({ source: _source, rewardStage: _stage, augmentTier: _tier, ...choice }) => choice);
+  const candidates = forgeMoveCatalog().filter(move => move.augmentTier === augmentTier && !known.has(move.id));
+  return weightedRewardOrder(candidates, `${seed}:moves`, move => moveRewardWeight(move.id, types, preferred, context))
+    .slice(0, 3)
+    .map(({ id, name, description, type, category, power }) => ({ id, name, description, type, category, power }));
 }
 
-/** One fixed version per family and grade; old level variants remain save-compatible only. */
+/** Native requested moves plus the nine fixed Silver environment setters. */
 export function forgeMoveCatalog() {
   initializeForgeRegistry();
-  return registeredMoves
-    .filter(move => move.rewardStage === (["weather", "terrain"].includes(move.source.templateId) ? 2 : 0))
-    .filter(move => move.category !== MoveCategory.STATUS || move.source.id.endsWith(`-${MoveCategory.PHYSICAL}`))
-    .filter(move => move.category !== MoveCategory.STATUS || move.augmentTier === undefined)
-    .map(({ source, rewardStage: _rewardStage, ...move }) => ({
+  const native = Object.entries(FORGE_NATIVE_MOVE_TIERS).flatMap(([tier, ids]) =>
+    ids.map(id => {
+      const move = allMoves[id];
+      return {
+        id,
+        name: move.name,
+        description: move.effect,
+        type: move.type,
+        category: move.category,
+        power: move.power,
+        augmentTier: Number(tier) as AugmentTier,
+        templateId: "native",
+        accuracy: move.accuracy,
+        pp: move.pp,
+        chance: move.chance,
+        priority: move.priority,
+      };
+    }),
+  );
+  const setters = registeredMoves
+    .filter(
+      move =>
+        move.category === MoveCategory.STATUS
+        && move.rewardStage === 2
+        && move.augmentTier === undefined
+        && move.source.id.endsWith(`-${MoveCategory.PHYSICAL}`),
+    )
+    .map(({ source, rewardStage: _stage, ...move }) => ({
       ...move,
+      augmentTier: AugmentTier.SILVER,
       templateId: source.templateId,
-      alwaysCrit: source.alwaysCrit ?? false,
-      augmentTier: move.category === MoveCategory.STATUS ? AugmentTier.SILVER : (move.augmentTier ?? AugmentTier.GOLD),
       accuracy: allMoves[move.id].accuracy,
       pp: allMoves[move.id].pp,
       chance: allMoves[move.id].chance,
       priority: allMoves[move.id].priority,
     }));
+  return [...native, ...setters];
 }
 
 /** Associated creator is a fixed Silver move, even when the ability itself is Gold/Prismatic. */

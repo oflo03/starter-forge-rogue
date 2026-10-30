@@ -293,7 +293,7 @@ function moveDescription(id: MoveId): string {
   const category = move.category === MoveCategory.PHYSICAL ? "물리" : "특수";
   const accuracy = move.accuracy < 0 ? "필중" : `${move.accuracy}%`;
   const priority = move.priority ? ` · 우선도 ${move.priority > 0 ? "+" : ""}${move.priority}` : "";
-  return `${typeName(move.type)} · ${category} · 위력 ${move.power} · 명중 ${accuracy} · PP ${move.pp}${priority}\n${move.effect}`;
+  return `${typeName(move.type)} · ${category} · 위력 ${move.power > 0 ? move.power : "—"} · 명중 ${accuracy} · PP ${move.pp}${priority}\n${move.effect}`;
 }
 function enhancedCategory(pokemon: PlayerPokemon, stats: number[]): MoveCategory | undefined {
   const nativeCategory = (id: AbilityId) =>
@@ -316,6 +316,9 @@ function enhancedCategory(pokemon: PlayerPokemon, stats: number[]): MoveCategory
   return (
     choice?.enhancedCategory ?? (pokemon.hasPassive() ? nativeCategory(pokemon.getPassiveAbility().id) : undefined)
   );
+}
+function equippedAbilities(pokemon: PlayerPokemon): AbilityId[] {
+  return [pokemon.getAbility().id, ...(pokemon.hasPassive() ? [pokemon.getPassiveAbility().id] : [])];
 }
 export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number): Promise<void> {
   const data = pokemon.customPokemonData.forge;
@@ -370,6 +373,7 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
             enhancedCategory(pokemon, stats),
             level,
             rarity,
+            { moves: pokemon.getMoveset(true).map(move => move.getMove().id), abilities: equippedAbilities(pokemon) },
           ).map(o => ({ name: o.name, description: moveDescription(o.id), value: o.id, moveId: o.id }));
         const id: MoveId = await chooseCards(`${name} · Lv.${level} · 기술`, makeOptions(seed), seed, makeOptions);
         await learnForgeMove(pokemon, id);
@@ -377,10 +381,14 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
         const passive = level === 41;
         const equipped = [pokemon.customPokemonData.ability, pokemon.customPokemonData.passive].filter(id => id >= 0);
         const makeOptions = (rollSeed: string, excluded: any[] = []) =>
-          abilityAugmentChoices(growthTypes(pokemon), stats, rollSeed, rarity, [
-            ...equipped,
-            ...excluded.map(value => value.id),
-          ]).map(o => {
+          abilityAugmentChoices(
+            growthTypes(pokemon),
+            stats,
+            rollSeed,
+            rarity,
+            [...equipped, ...excluded.map(value => value.id)],
+            { moves: pokemon.getMoveset(true).map(move => move.getMove().id), abilities: equippedAbilities(pokemon) },
+          ).map(o => {
             const creator = environmentCreatorForAbility(o.id);
             return {
               name: o.name,

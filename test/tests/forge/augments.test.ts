@@ -20,8 +20,8 @@ const stats = [90, 120, 80, 60, 80, 100];
 describe("Forge augment grades and shared ability pool", () => {
   it("publishes every current creative move family with actual registered combat values", () => {
     const catalog = forgeMoveCatalog();
-    expect(new Set(catalog.map(move => `${move.name}:${move.type}:${move.category}`)).size).toBe(213);
-    expect(catalog).toHaveLength(204 * 3 + 9);
+    expect(new Set(catalog.map(move => `${move.name}:${move.type}:${move.category}`)).size).toBe(801);
+    expect(catalog).toHaveLength(792 + 9);
     expect(new Set(catalog.map(move => `${move.name}:${move.type}:${move.category}:${move.augmentTier}`)).size).toBe(
       catalog.length,
     );
@@ -45,29 +45,23 @@ describe("Forge augment grades and shared ability pool", () => {
       setters.every(move => move.category === MoveCategory.STATUS && move.power <= 0 && move.is("StatusMove")),
     ).toBe(true);
     for (const creator of environments) {
-      const legacy = setters.find(move => move.name === creator.name && move.id !== creator.id)!;
+      const legacy = allMoves.findIndex((move, index) => move.id === creator.id && index !== creator.id) as MoveId;
       expect(
-        customMoveChoices(
-          [creator.type],
-          stats,
-          "legacy-creator",
-          [legacy.id],
-          undefined,
-          11,
-          AugmentTier.SILVER,
-        ).every(move => move.name !== creator.name),
+        customMoveChoices([creator.type], stats, "legacy-creator", [legacy], undefined, 11, AugmentTier.SILVER).every(
+          move => move.name !== creator.name,
+        ),
       ).toBe(true);
     }
   });
   it("offers fixed Silver creators only and links all nine environment benefits", () => {
     const catalog = forgeMoveCatalog();
-    const creators = catalog.filter(move => move.category === MoveCategory.STATUS);
+    const creators = catalog.filter(move => move.templateId !== "native");
     expect(creators.every(move => move.augmentTier === AugmentTier.SILVER && move.pp === 10)).toBe(true);
     for (const creator of creators) {
       for (const tier of [AugmentTier.GOLD, AugmentTier.PRISMATIC]) {
         expect(
           customMoveChoices([creator.type], stats, "no-high-creators", [], undefined, 11, tier).every(
-            move => move.category !== MoveCategory.STATUS,
+            move => move.name !== creator.name,
           ),
         ).toBe(true);
       }
@@ -195,41 +189,19 @@ describe("Forge augment grades and shared ability pool", () => {
     expect(collected.every(pool => !pool.has(AbilityId.SPICY_SPRAY))).toBe(true);
   });
 
-  it("changes real learned move power and PP by grade while preserving effects and critical caps", () => {
-    const choices = [AugmentTier.SILVER, AugmentTier.GOLD, AugmentTier.PRISMATIC].map(tier =>
-      customMoveChoices([PokemonType.FIRE], stats, "same-offer", [], MoveCategory.PHYSICAL, 51, tier),
-    );
-    for (let i = 0; i < 3; i++) {
-      expect(choices[0][i].name).toBe(choices[1][i].name);
-      expect(choices[2][i].name).toBe(choices[1][i].name);
-      expect(choices[0][i].power).toBeLessThanOrEqual(choices[1][i].power);
-      expect(choices[2][i].power).toBeGreaterThanOrEqual(choices[1][i].power);
-      const gold = allMoves[choices[1][i].id];
-      const prism = allMoves[choices[2][i].id];
-      expect(prism.pp).toBe(gold.pp + 5);
-      expect(prism.hasAttr("MultiHitAttr")).toBe(gold.hasAttr("MultiHitAttr"));
-      expect(prism.hasAttr("HitHealAttr")).toBe(gold.hasAttr("HitHealAttr"));
-      expect(prism.hasAttr("RecoilAttr")).toBe(gold.hasAttr("RecoilAttr"));
+  it("keeps native IDs and exact user tiers without modifying original power or PP", () => {
+    const catalog = forgeMoveCatalog().filter(move => move.templateId === "native");
+    expect(catalog).toHaveLength(792);
+    for (const move of catalog) {
+      expect(MoveId[move.id]).toBeDefined();
+      expect(move.power).toBe(allMoves[move.id].power);
+      expect(move.pp).toBe(allMoves[move.id].pp);
     }
-    for (const tier of [AugmentTier.SILVER, AugmentTier.GOLD, AugmentTier.PRISMATIC]) {
-      for (let seed = 0; seed < 40; seed++) {
-        const pool = customMoveChoices(
-          [PokemonType.WATER],
-          [90, 80, 100, 80, 90, 90],
-          `crit-${seed}`,
-          [],
-          undefined,
-          51,
-          tier,
-        );
-        for (const choice of pool) {
-          const move = allMoves[choice.id];
-          if (move.hasAttr("CritOnlyAttr")) {
-            expect(move.power).toBeLessThanOrEqual(70);
-            expect(move.hasAttr("MultiHitAttr")).toBe(false);
-          }
-        }
-      }
+    expect(catalog.find(move => move.id === MoveId.SWORDS_DANCE)?.augmentTier).toBe(AugmentTier.PRISMATIC);
+    expect(catalog.find(move => move.id === MoveId.PROTECT)?.augmentTier).toBe(AugmentTier.GOLD);
+    expect(catalog.find(move => move.id === MoveId.SKETCH)?.augmentTier).toBe(AugmentTier.SILVER);
+    for (const id of [MoveId.BIDE, MoveId.NATURAL_GIFT, MoveId.RECYCLE, MoveId.CORROSIVE_GAS]) {
+      expect(catalog.some(move => move.id === id)).toBe(false);
     }
   });
 });

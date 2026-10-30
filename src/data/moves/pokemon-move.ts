@@ -39,7 +39,8 @@ export class PokemonMove {
   public maxPpOverride?: number | undefined;
 
   constructor(moveId: MoveId, ppUsed = 0, ppUp = 0, maxPpOverride?: number) {
-    this.moveId = moveId;
+    // Old Forge move slots alias native moves after creative rewards are retired.
+    this.moveId = allMoves[moveId]?.id ?? moveId;
     this.ppUsed = ppUsed;
     this.ppUp = ppUp;
     this.maxPpOverride = maxPpOverride;

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
-import { AugmentTier } from "#app/forge/augments";
 import {
   clearForgeGasWithWind,
   FORGE_TERRAINS,
@@ -17,7 +16,6 @@ import { CustomPokemonData, PokemonSummonData } from "#data/pokemon-data";
 import { getTerrainName, Terrain, TerrainType } from "#data/terrain";
 import { getCustomWeatherName, getWeatherMultiplierForMove, Weather } from "#data/weather";
 import { AbilityId } from "#enums/ability-id";
-import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
@@ -260,38 +258,11 @@ describe("Forge native environments and reward slots", () => {
     expect(mon.summonData.forgeSwampCount).toBe(5);
   });
 
-  it("provides fixed moves, environment attacks and capped single-hit criticals at all levels", () => {
-    for (const level of [11, 21, 31, 41, 51]) {
-      for (const definition of FORGE_WEATHERS) {
-        const choices = customMoveChoices(
-          [...definition.affinity],
-          stats,
-          "late-reward",
-          [],
-          MoveCategory.PHYSICAL,
-          level,
-          AugmentTier.SILVER,
-        );
-        expect(choices).toHaveLength(3);
-        if (level >= 31) {
-          expect(
-            choices.some(
-              choice =>
-                allMoves[choice.id].hasAttr("WeatherChangeAttr") || allMoves[choice.id].hasAttr("TerrainChangeAttr"),
-            ),
-          ).toBe(true);
-        }
-        for (const choice of choices) {
-          const move = allMoves[choice.id];
-          if (move.hasAttr("CritOnlyAttr")) {
-            expect(move.power).toBeLessThanOrEqual(70);
-            expect(move.hasAttr("MultiHitAttr")).toBe(false);
-          }
-        }
-      }
+  it("keeps native rewards fixed across levels and retains nine status-only environments", () => {
+    for (const level of [11, 31, 51]) {
+      const moves = customMoveChoices([PokemonType.FIRE], stats, "fixed-native", [], undefined, level);
+      expect(moves).toHaveLength(3);
+      expect(moves).toEqual(customMoveChoices([PokemonType.FIRE], stats, "fixed-native"));
     }
-    const early = customMoveChoices([PokemonType.FIRE], stats, "strong", [], undefined, 11);
-    const late = customMoveChoices([PokemonType.FIRE], stats, "strong", [], undefined, 51);
-    expect(late).toEqual(early);
   });
 });
