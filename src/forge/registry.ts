@@ -4,6 +4,7 @@ import {
   BlockCritAbAttr,
   LowHpMoveTypePowerBoostAbAttr,
   MoveDamageBoostAbAttr,
+  MovePowerBoostAbAttr,
   PostBiomeChangeTerrainChangeAbAttr,
   PostBiomeChangeWeatherChangeAbAttr,
   PostSummonTerrainChangeAbAttr,
@@ -22,7 +23,9 @@ import { MoveId } from "#enums/move-id";
 import { MultiHitType } from "#enums/multi-hit-type";
 import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
+import { TerrainType as ForgeTerrainType } from "#enums/terrain-type";
 import type { WeatherType } from "#enums/weather-type";
+import { WeatherType as ForgeWeatherType } from "#enums/weather-type";
 import {
   AttackMove,
   CritOnlyAttr,
@@ -38,6 +41,14 @@ import {
 } from "#moves/move";
 import { AugmentTier } from "./augments";
 import { FORGE_TERRAINS, FORGE_WEATHERS } from "./environment";
+import {
+  benefitTerrain,
+  benefitWeather,
+  FORGE_ENVIRONMENT_BENEFITS,
+  forgeEnvironmentBenefitIds,
+  forgeLightningFollowup,
+  forgePaintBoost,
+} from "./environment-abilities";
 
 /** Attack setters still deal damage when the same environment is already active. */
 class ForgeWeatherAttackAttr extends WeatherChangeAttr {
@@ -143,6 +154,7 @@ const registeredPassives: (ForgeAbilityChoice & {
   environment: "weather" | "terrain" | "support";
 })[] = [];
 let initialized = false;
+const registeredEnvironmentBenefits: (ForgeAbilityChoice & { tier: AugmentTier })[] = [];
 
 function addAbility(builder: AbBuilder, name: string, description: string): ForgeAbilityChoice {
   const ability = builder.build();
@@ -455,6 +467,40 @@ export function initializeForgeRegistry(): void {
   }
   initializeEnvironmentRewards();
   initializeGradedMoves();
+  for (const definition of FORGE_ENVIRONMENT_BENEFITS) {
+    const builder = new AbBuilder(AbilityId.BLAZE, 9);
+    if (definition.key === "compress") {
+      builder.conditionalAttr(
+        () => benefitWeather(ForgeWeatherType.POISON_GAS),
+        MoveDamageBoostAbAttr,
+        1.5,
+        (user, _target, move) => user.getMoveType(move) === PokemonType.POISON,
+      );
+    }
+    if (definition.key === "wall") {
+      builder
+        .conditionalAttr(
+          () => benefitTerrain(ForgeTerrainType.ANTHILL),
+          ReceivedMoveDamageMultiplierAbAttr,
+          (_target, user, move) =>
+            [PokemonType.FIRE, PokemonType.FLYING].includes(user?.getMoveType(move) ?? move.type),
+          0.5,
+        )
+        .ignorable();
+    }
+    if (definition.key === "corner") {
+      builder.conditionalAttr(() => benefitTerrain(ForgeTerrainType.OCTAGON), StatMultiplierAbAttr, Stat.SPD, 2);
+    }
+    if (definition.key === "paint") {
+      builder.attr(MovePowerBoostAbAttr, (user, _target, move) => forgePaintBoost(user, move), 1.3);
+    }
+    if (definition.key === "lightning") {
+      builder.attr(MovePowerBoostAbAttr, (user, _target, move) => forgeLightningFollowup(user, move), 2);
+    }
+    const ability = addAbility(builder, definition.name, definition.description);
+    forgeEnvironmentBenefitIds.set(definition.key, ability.id);
+    registeredEnvironmentBenefits.push({ ...ability, tier: definition.tier });
+  }
   initialized = true;
 }
 
@@ -896,7 +942,8 @@ export function abilityAugmentChoices(
       description: allAbilities[id].description,
     }));
   const environment = tier === AugmentTier.GOLD ? registeredPassives : [];
-  const pool = [...originals, ...environment].filter(choice => !excluded.includes(choice.id));
+  const benefits = registeredEnvironmentBenefits.filter(choice => choice.tier === tier);
+  const pool = [...originals, ...environment, ...benefits].filter(choice => !excluded.includes(choice.id));
   const ordered = seededOrder(pool, `${seed}:unified-abilities`);
   return ordered.slice(0, 3);
 }
@@ -985,6 +1032,22 @@ export function customMoveChoices(
     }
   }
   return choices.map(({ source: _source, rewardStage: _stage, augmentTier: _tier, ...choice }) => choice);
+}
+
+/** Current reward variants for the public catalog, excluding legacy-only levels. */
+export function forgeMoveCatalog() {
+  initializeForgeRegistry();
+  return registeredMoves
+    .filter(move => [0, 2, 4].includes(move.rewardStage))
+    .map(({ source: _source, rewardStage, ...move }) => ({
+      ...move,
+      rewardLevel: 11 + rewardStage * 10,
+      augmentTier: move.augmentTier ?? AugmentTier.GOLD,
+      accuracy: allMoves[move.id].accuracy,
+      pp: allMoves[move.id].pp,
+      chance: allMoves[move.id].chance,
+      priority: allMoves[move.id].priority,
+    }));
 }
 
 export function customAbilityChoices(

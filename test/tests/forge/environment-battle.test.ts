@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { FORGE_TERRAINS, FORGE_WEATHERS } from "#app/forge/environment";
+import { forgeEnvironmentBenefitIds, forgeGalePriority } from "#app/forge/environment-abilities";
 import { initializeForgeRegistry } from "#app/forge/registry";
 import { allMoves } from "#data/data-lists";
 import { TerrainType } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
+import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
 import { WeatherType } from "#enums/weather-type";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("Forge native battle phase integration", () => {
   let phaser: Phaser.Game;
@@ -99,5 +101,94 @@ describe("Forge native battle phase integration", () => {
     game.move.select(MoveId.SPLASH);
     await game.phaseInterceptor.to("TurnEndPhase");
     expect(mon.formIndex).toBe(0);
+  });
+  it("dark heart evaluates all actual HP damage and grows only on an undamaged dark turn", async () => {
+    game.override.ability(AbilityId.NONE).weather(WeatherType.DARK_AURA).moveset(MoveId.SPLASH);
+    await game.classicMode.startBattle(SpeciesId.EEVEE);
+    const p = game.field.getPlayerPokemon();
+    p.customPokemonData.ability = forgeEnvironmentBenefitIds.get("evil")!;
+    p.damage(1, false, true, true);
+    p.hp++;
+    game.move.select(MoveId.SPLASH);
+    await game.phaseInterceptor.to("TurnEndPhase");
+    expect(p.getStatStage(Stat.ATK)).toBe(0);
+    await game.phaseInterceptor.to("CommandPhase");
+    game.move.select(MoveId.SPLASH);
+    await game.phaseInterceptor.to("TurnEndPhase");
+    await game.phaseInterceptor.to("CommandPhase");
+    expect(p.getStatStage(Stat.ATK)).toBe(1);
+    expect(p.getStatStage(Stat.SPATK)).toBe(1);
+  });
+  it("dark heart also sees later end-of-turn damage from the opponent", async () => {
+    game.override
+      .ability(AbilityId.NONE)
+      .enemyAbility(AbilityId.BAD_DREAMS)
+      .weather(WeatherType.DARK_AURA)
+      .moveset(MoveId.SPLASH);
+    await game.classicMode.startBattle(SpeciesId.EEVEE);
+    const p = game.field.getPlayerPokemon();
+    p.customPokemonData.ability = forgeEnvironmentBenefitIds.get("evil")!;
+    p.customPokemonData.passive = AbilityId.COMATOSE;
+    p.passive = true;
+    expect(p.hasAbility(AbilityId.COMATOSE)).toBe(true);
+    const hp = p.hp;
+    game.move.select(MoveId.SPLASH);
+    await game.phaseInterceptor.to("CommandPhase");
+    expect(p.hp).toBeLessThan(hp);
+    expect(p.getStatStage(Stat.ATK)).toBe(0);
+    expect(p.getStatStage(Stat.SPATK)).toBe(0);
+  });
+  it("real mist misses grant both +2 while protection does not count as a miss", async () => {
+    game.override.ability(AbilityId.NONE).weather(WeatherType.SILENT_MIST).moveset(MoveId.STONE_EDGE);
+    await game.classicMode.startBattle(SpeciesId.EEVEE);
+    const p = game.field.getPlayerPokemon();
+    p.customPokemonData.ability = forgeEnvironmentBenefitIds.get("miss")!;
+    vi.spyOn(p, "randBattleSeedInt").mockImplementation(range => range - 1);
+    game.move.select(MoveId.STONE_EDGE);
+    await game.phaseInterceptor.to("CommandPhase");
+    expect(p.getStatStage(Stat.ATK)).toBe(2);
+    expect(p.getStatStage(Stat.SPATK)).toBe(2);
+    game.override.enemyMoveset(MoveId.PROTECT);
+    game.move.changeMoveset(game.field.getEnemyPokemon(), MoveId.PROTECT);
+    game.move.select(MoveId.STONE_EDGE);
+    await game.phaseInterceptor.to("CommandPhase");
+    expect(p.getStatStage(Stat.ATK)).toBe(2);
+  });
+  it("wind reading protects before the priority attack without replacing the selected action", async () => {
+    game.override.ability(AbilityId.NONE).weather(WeatherType.GALE).moveset(MoveId.SPLASH).enemyMoveset(MoveId.TACKLE);
+    await game.classicMode.startBattle(SpeciesId.EEVEE);
+    const p = game.field.getPlayerPokemon();
+    p.customPokemonData.ability = forgeEnvironmentBenefitIds.get("wind")!;
+    for (let t = 1; t < 100; t++) {
+      game.scene.currentBattle.turn = t;
+      if (forgeGalePriority(p) === 0) {
+        break;
+      }
+    }
+    const hp = p.hp;
+    const pp = p.getMoveset()[0].ppUsed;
+    game.move.select(MoveId.SPLASH);
+    await game.phaseInterceptor.to("TurnEndPhase");
+    expect(p.hp).toBe(hp);
+    expect(p.getMoveset()[0].ppUsed).toBe(pp + 1);
+  });
+  it("poison compression really hits at extreme accuracy stages but cannot hit steel immunity", async () => {
+    game.override.ability(AbilityId.NONE).weather(WeatherType.POISON_GAS).moveset(MoveId.SLUDGE_BOMB);
+    await game.classicMode.startBattle(SpeciesId.EEVEE);
+    const p = game.field.getPlayerPokemon();
+    p.customPokemonData.ability = forgeEnvironmentBenefitIds.get("compress")!;
+    const e = game.field.getEnemyPokemon();
+    p.setStatStage(Stat.ACC, -6);
+    e.setStatStage(Stat.EVA, 6);
+    vi.spyOn(p, "randBattleSeedInt").mockImplementation(range => range - 1);
+    const hp = e.hp;
+    game.move.select(MoveId.SLUDGE_BOMB);
+    await game.phaseInterceptor.to("CommandPhase");
+    expect(e.hp).toBeLessThan(hp);
+    e.customPokemonData.types = [PokemonType.STEEL];
+    const immuneHp = e.hp;
+    game.move.select(MoveId.SLUDGE_BOMB);
+    await game.phaseInterceptor.to("TurnEndPhase");
+    expect(e.hp).toBe(immuneHp);
   });
 });

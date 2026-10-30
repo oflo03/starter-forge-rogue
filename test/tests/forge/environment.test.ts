@@ -4,11 +4,11 @@ import {
   clearForgeGasWithWind,
   FORGE_TERRAINS,
   FORGE_WEATHERS,
-  forgeGalePriority,
   forgeGasBackfire,
   forgeSwampTick,
   forgeWeatherTick,
 } from "#app/forge/environment";
+import { forgeGalePriority } from "#app/forge/environment-abilities";
 import { customMoveChoices, customPassiveChoices, initializeForgeRegistry } from "#app/forge/registry";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { CustomPokemonData, PokemonSummonData } from "#data/pokemon-data";

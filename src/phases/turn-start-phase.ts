@@ -1,5 +1,6 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import type { TurnCommand } from "#app/battle";
+import { forgeAutomaticProtect } from "#app/forge/environment-abilities";
 import { globalScene } from "#app/global-scene";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import type { BattlerIndex } from "#enums/battler-index";
@@ -53,6 +54,11 @@ export class TurnStartPhase extends FieldPhase {
 
     const field = globalScene.getField();
     const moveOrder = this.getCommandOrder();
+    for (const pokemon of field) {
+      if (pokemon?.isActive(true)) {
+        forgeAutomaticProtect(pokemon);
+      }
+    }
 
     for (const pokemon of inSpeedOrder(ArenaTagSide.BOTH)) {
       const preTurnCommand = globalScene.currentBattle.preTurnCommands[pokemon.getBattlerIndex()];

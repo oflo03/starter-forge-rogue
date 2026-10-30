@@ -155,6 +155,9 @@ interface SerializedPokemonSummonData {
 export class PokemonSummonData {
   /** Native summon reset clears the Swamp countdown on switching. */
   public forgeSwampCount = 5;
+  public forgeProtectTurn = -10;
+  public forgeProtectWave = -1;
+  public forgeProtectStreak = 0;
   /** [Atk, Def, SpAtk, SpDef, Spd, Acc, Eva] */
   public statStages: number[] = [0, 0, 0, 0, 0, 0, 0];
   /**
@@ -381,6 +384,13 @@ export class PokemonWaveData {
  * Resets at the start of a new turn, as well as on switch.
  */
 export class PokemonTurnData {
+  public forgeHpDamageTaken = 0;
+  public forgeWindAttempted = false;
+  public forgeLightningMulti = false;
+  public forgeMissRewarded = false;
+  public forgeSwampRewarded = false;
+  public forgePaintMove?: MoveId;
+  public forgePaintBoost = false;
   // #region Move usage-related properties
 
   // All of these properties can likely go inside a "move-in-flight" object later

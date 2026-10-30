@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { AugmentTier, rollAugmentTier } from "#app/forge/augments";
+import { FORGE_ENVIRONMENT_BENEFITS } from "#app/forge/environment-abilities";
 import { FORGE_ABILITY_LEVELS, FORGE_MOVE_LEVELS } from "#app/forge/progression";
-import { abilityAugmentChoices, customMoveChoices } from "#app/forge/registry";
+import { abilityAugmentChoices, customMoveChoices, forgeMoveCatalog } from "#app/forge/registry";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { CustomPokemonData } from "#data/pokemon-data";
 import { AbilityId } from "#enums/ability-id";
@@ -11,6 +12,17 @@ import { describe, expect, it } from "vitest";
 
 const stats = [90, 120, 80, 60, 80, 100];
 describe("Forge augment grades and shared ability pool", () => {
+  it("publishes every current creative move family with actual registered combat values", () => {
+    const catalog = forgeMoveCatalog();
+    expect(new Set(catalog.map(move => `${move.name}:${move.type}:${move.category}`)).size).toBe(222);
+    expect([...new Set(catalog.map(move => move.rewardLevel))].sort((a, b) => a - b)).toEqual([11, 31, 51]);
+    expect(new Set(catalog.map(move => move.id)).size).toBe(catalog.length);
+    for (const move of catalog) {
+      expect(move.power).toBe(allMoves[move.id].power);
+      expect(move.pp).toBe(allMoves[move.id].pp);
+      expect(move.description).toBe(allMoves[move.id].effect);
+    }
+  });
   it("keeps ability-only levels and preserves both legacy and newly earned slot rewards", () => {
     expect(FORGE_ABILITY_LEVELS).toEqual([21, 41]);
     expect(FORGE_MOVE_LEVELS).toEqual([11, 31, 51]);
@@ -49,7 +61,11 @@ describe("Forge augment grades and shared ability pool", () => {
       expect(
         [...all]
           .filter(id => AbilityId[id] === undefined)
-          .every(id => /메이커|어둠내림|바람몰이|고요한숨|매캐한숨|먹구름부름/.test(allAbilities[id].name)),
+          .every(
+            id =>
+              /메이커|어둠내림|바람몰이|고요한숨|매캐한숨|먹구름부름/.test(allAbilities[id].name)
+              || FORGE_ENVIRONMENT_BENEFITS.some(b => b.name === allAbilities[id].name),
+          ),
       ).toBe(true);
       const seen: AbilityId[] = [];
       for (let i = 0; i < 3; i++) {
@@ -60,7 +76,7 @@ describe("Forge augment grades and shared ability pool", () => {
       }
       collected.push(all);
     }
-    expect(collected.map(pool => pool.size)).toEqual([118, 107, 33]);
+    expect(collected.map(pool => pool.size)).toEqual([118, 113, 36]);
     for (const id of [
       AbilityId.MAGNET_PULL,
       AbilityId.COTTON_DOWN,
@@ -100,8 +116,8 @@ describe("Forge augment grades and shared ability pool", () => {
       expect(collected[2].has(id)).toBe(true);
     }
     expect(collected.every(pool => !pool.has(AbilityId.ILLUSION))).toBe(true);
-    expect(collected.flatMap(pool => [...pool]).filter(id => !AbilityId[id])).toHaveLength(9);
-    expect([...collected[1]].filter(id => !AbilityId[id])).toHaveLength(9);
+    expect(collected.flatMap(pool => [...pool]).filter(id => !AbilityId[id])).toHaveLength(18);
+    expect([...collected[1]].filter(id => !AbilityId[id])).toHaveLength(15);
     expect(collected.every(pool => !pool.has(AbilityId.SPICY_SPRAY))).toBe(true);
   });
 

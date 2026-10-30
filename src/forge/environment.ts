@@ -3,8 +3,10 @@ import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getTypeDamageMultiplier } from "#data/type";
 import { isWeatherSuppressed, matchesWeather } from "#data/weather";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { HitResult } from "#enums/hit-result";
 import { MoveFlags } from "#enums/move-flags";
+import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { TerrainType } from "#enums/terrain-type";
 import { WeatherType } from "#enums/weather-type";
@@ -12,6 +14,7 @@ import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
 import { toDmgValue } from "#utils/common";
 import { ValueHolder } from "#utils/value-holder";
+import { forgeSwampBenefit, hasForgeBenefit } from "./environment-abilities";
 
 export const FORGE_WEATHERS = [
   {
@@ -92,18 +95,6 @@ export function forgeWeatherActive(type: WeatherType): boolean {
   return globalScene.arena?.weatherType === type && !isWeatherSuppressed();
 }
 
-/** A pure seeded side choice stays the same throughout AI previews and execution in one turn. */
-export function forgeGalePriority(pokemon: Pokemon): number {
-  if (!forgeWeatherActive(WeatherType.GALE)) {
-    return 0;
-  }
-  let hash = 2166136261;
-  for (const char of `${globalScene.seed}:${globalScene.currentBattle.waveIndex}:${globalScene.currentBattle.turn}:gale`) {
-    hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
-  }
-  return pokemon.isPlayer() === ((hash & 1) === 0) ? 3 : 0;
-}
-
 export function clearForgeGasWithWind(pokemon: Pokemon, move: Move): void {
   if (move.hasFlag(MoveFlags.WIND_MOVE) && forgeWeatherActive(WeatherType.POISON_GAS)) {
     globalScene.arena.trySetWeather(WeatherType.NONE, pokemon);
@@ -138,6 +129,11 @@ export function forgeWeatherTick(pokemon: Pokemon): void {
     );
   }
   if (globalScene.arena.weatherType === WeatherType.THUNDERSTORM && pokemon.randBattleSeedInt(3) === 0) {
+    if (hasForgeBenefit(pokemon, "lightning")) {
+      pokemon.addTag(BattlerTagType.CHARGED, 0, MoveId.CHARGE, pokemon.id);
+      globalScene.phaseManager.queueMessage(`${pokemon.name}는 벼락저금으로 낙뢰를 충전했다!`);
+      return;
+    }
     const multiplier = pokemon
       .getTypes({ returnOriginalTypesIfStellar: true })
       .reduce<number>((value, type) => value * getTypeDamageMultiplier(PokemonType.ELECTRIC, type), 1);
@@ -158,5 +154,7 @@ export function forgeSwampTick(pokemon: Pokemon): void {
   globalScene.phaseManager.queueMessage(`${pokemon.name}의 늪 카운트: ${pokemon.summonData.forgeSwampCount}`);
   if (pokemon.summonData.forgeSwampCount === 0) {
     pokemon.damageAndUpdate(pokemon.hp, { result: HitResult.INDIRECT_KO, ignoreSegments: true });
+  } else {
+    forgeSwampBenefit(pokemon);
   }
 }

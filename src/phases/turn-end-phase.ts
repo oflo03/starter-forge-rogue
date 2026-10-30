@@ -1,5 +1,6 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { forgeSwampTick } from "#app/forge/environment";
+import { forgeBenefitTurnEnd } from "#app/forge/environment-abilities";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { TerrainType } from "#data/terrain";
@@ -73,6 +74,12 @@ export class TurnEndPhase extends FieldPhase {
       this.executeForAll(handlePokemon);
 
       globalScene.arena.lapseTags();
+      // Evaluate no-damage rewards after both sides' residual damage, before weather expires.
+      this.executeForAll(pokemon => {
+        if (!pokemon.switchOutStatus && pokemon.hp > 0) {
+          forgeBenefitTurnEnd(pokemon);
+        }
+      });
     }
 
     if (globalScene.arena.weather && !globalScene.arena.weather.lapse()) {

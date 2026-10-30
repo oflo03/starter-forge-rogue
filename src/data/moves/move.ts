@@ -11,7 +11,8 @@ import type {
 } from "#abilities/ab-attrs";
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { loggedInUser } from "#app/account";
-import { forgeGalePriority, forgeWeatherActive } from "#app/forge/environment";
+import { forgeWeatherActive } from "#app/forge/environment";
+import { forgeGalePriority, forgeProtectChain, forgeRecordManualProtect } from "#app/forge/environment-abilities";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import type { EntryHazardTag, PendingHealTag } from "#data/arena-tag";
@@ -6868,6 +6869,13 @@ export class TrapAttr extends AddBattlerTagAttr {
 }
 
 export class ProtectAttr extends AddBattlerTagAttr {
+  override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    const applied = super.apply(user, target, move, args);
+    if (applied) {
+      forgeRecordManualProtect(user);
+    }
+    return applied;
+  }
   constructor(tagType: BattlerTagType = BattlerTagType.PROTECTED) {
     super(tagType, true);
   }
@@ -6891,6 +6899,7 @@ export class ProtectAttr extends AddBattlerTagAttr {
         timesUsed++;
       }
 
+      timesUsed = forgeProtectChain(user, timesUsed);
       return timesUsed === 0 || user.randBattleSeedInt(Math.pow(3, timesUsed)) === 0;
     };
   }

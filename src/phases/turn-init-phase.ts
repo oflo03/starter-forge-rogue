@@ -1,4 +1,5 @@
-import { forgeGalePriority, forgeWeatherActive } from "#app/forge/environment";
+import { forgeWeatherActive } from "#app/forge/environment";
+import { forgeGalePriority } from "#app/forge/environment-abilities";
 import { globalScene } from "#app/global-scene";
 import { BattlerIndex } from "#enums/battler-index";
 import { WeatherType } from "#enums/weather-type";

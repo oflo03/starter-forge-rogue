@@ -1,5 +1,6 @@
 import type { PostMoveInteractionAbAttrParams, PostMoveUsedAbAttrParams } from "#abilities/ab-attrs";
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
+import { forgeBeginAttack, forgeMistMiss, forgePoisonAccuracy } from "#app/forge/environment-abilities";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { ConditionalProtectTag } from "#data/arena-tag";
@@ -171,6 +172,9 @@ export class MoveEffectPhase extends PokemonPhase {
     const targets = this.conductHitChecks(user, fieldMove);
 
     this.firstHit = user.turnData.hitCount === user.turnData.hitsLeft;
+    if (this.firstHit) {
+      forgeBeginAttack(user, move);
+    }
     this.lastHit = user.turnData.hitsLeft === 1 || !targets.some(t => t.isActive(true));
 
     // Play the animation if the move was successful against any of its targets or it has a POST_TARGET effect (like self destruct)
@@ -315,6 +319,7 @@ export class MoveEffectPhase extends PokemonPhase {
           applyMoveAttrs("NoEffectAttr", user, target, this.move);
           break;
         case HitCheckResult.MISS:
+          forgeMistMiss(user, this.move);
           globalScene.phaseManager.queueMessage(
             i18next.t("battle:attackMissed", { pokemonNameWithAffix: getPokemonNameWithAffix(target) }),
           );
@@ -424,7 +429,7 @@ export class MoveEffectPhase extends PokemonPhase {
       || target.getTag(BattlerTagType.ALWAYS_GET_HIT)
       || (target.getTag(BattlerTagType.TELEKINESIS) && !this.move.hasAttr("OneHitKOAttr"));
 
-    if (moveAccuracy === -1 || bypassAccuracy) {
+    if (moveAccuracy === -1 || bypassAccuracy || forgePoisonAccuracy(user, this.move)) {
       return [HitCheckResult.HIT, effectiveness];
     }
 
