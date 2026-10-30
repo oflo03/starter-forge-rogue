@@ -5,7 +5,6 @@ import { PLAYER_PARTY_MAX_SIZE } from "#app/constants";
 import { forgeBodyForSeed } from "#app/forge/body";
 import { globalScene } from "#app/global-scene";
 import { speciesDataRegistry } from "#app/global-species-data-registry";
-import { initMoveAnim } from "#data/battle-anims";
 import { allMoves } from "#data/data-lists";
 import { getLevelTotalExp } from "#data/exp";
 import { CustomPokemonData } from "#data/pokemon-data";
@@ -33,6 +32,7 @@ import { forgeAppearance, forgeTypeChoice } from "./appearance";
 import { AUGMENT_REROLLS, type AugmentTier, rollAugmentTier } from "./augments";
 import { DraftInputGate } from "./draft-input";
 import { animateForgeEvolution } from "./evolution";
+import { learnForgeMove } from "./learn-move";
 import { FORGE_ABILITY_LEVELS, FORGE_MILESTONES, FORGE_MOVE_LEVELS } from "./progression";
 import {
   abilityAugmentChoices,
@@ -368,36 +368,7 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
             rarity,
           ).map(o => ({ name: o.name, description: moveDescription(o.id), value: o.id, moveId: o.id }));
         const id: MoveId = await chooseCards(`${name} · Lv.${level} · 기술`, makeOptions(seed), seed, makeOptions);
-        let slot = pokemon.getMoveset(true).length;
-        if (slot >= 4) {
-          const category = enhancedCategory(pokemon, stats);
-          // Original TMs can change a player's bundle; do not trap an already changed moveset.
-          const required =
-            category === undefined
-              ? 0
-              : Math.min(2, pokemon.getMoveset(true).filter(m => allMoves[m.moveId].category === category).length);
-          const replacements = pokemon
-            .getMoveset()
-            .map((m, i) => ({ m, i }))
-            .filter(
-              ({ i }) =>
-                category === undefined
-                || pokemon.getMoveset(true).filter((m, j) => allMoves[j === i ? id : m.moveId].category === category)
-                  .length >= required,
-            );
-          slot = await chooseList("교체할 기술을 선택하세요.", [
-            ...replacements.map(({ m, i }) => ({
-              name: allMoves[m.moveId].name,
-              description: moveDescription(m.moveId),
-              value: i,
-            })),
-            { name: "배우지 않기", value: -1 },
-          ]);
-        }
-        if (slot >= 0) {
-          await initMoveAnim(id);
-          pokemon.moveset[slot] = new PokemonMove(id);
-        }
+        await learnForgeMove(pokemon, id);
       } else if (FORGE_ABILITY_LEVELS.includes(level) && (level === 21 ? missingAbility : missingPassive)) {
         const passive = level === 41;
         const equipped = [pokemon.customPokemonData.ability, pokemon.customPokemonData.passive].filter(id => id >= 0);

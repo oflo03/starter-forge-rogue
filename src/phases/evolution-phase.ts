@@ -286,13 +286,23 @@ export class EvolutionPhase extends Phase {
       null,
       () => {
         this.pokemon.cry();
-        this.pokemon.getPossibleEvolution(this.evolution).then(evolvedPokemon => {
-          this.updateEvolvedPokemonSprites(evolvedPokemon);
-          this.playEvolutionAnimation(evolvedPokemon);
-        });
+        this.createEvolutionPreview()
+          .then(evolvedPokemon => {
+            this.updateEvolvedPokemonSprites(evolvedPokemon);
+            this.playEvolutionAnimation(evolvedPokemon);
+          })
+          .catch(error => this.onEvolutionPreviewError(error));
       },
       1000,
     );
+  }
+
+  protected createEvolutionPreview(): Promise<Pokemon> {
+    return this.pokemon.getPossibleEvolution(this.evolution);
+  }
+
+  protected onEvolutionPreviewError(error: unknown): void {
+    throw error;
   }
 
   /** Used exclusively by {@linkcode handleFailedEvolution} to fade out the evolution sprites and music */
@@ -399,8 +409,12 @@ export class EvolutionPhase extends Phase {
   protected getEvolutionDoneMessage(): string {
     return i18next.t("menu:evolutionDone", {
       pokemonName: this.preEvolvedPokemonName,
-      evolvedPokemonName: this.pokemon.name,
+      evolvedPokemonName: this.getEvolvedPokemonDisplayName(),
     });
+  }
+
+  protected getEvolvedPokemonDisplayName(): string {
+    return this.pokemon.name;
   }
 
   protected queuePostEvolutionPhases(): void {

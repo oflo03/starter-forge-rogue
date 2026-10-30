@@ -32,20 +32,18 @@ class ForgeEvolutionAnimation extends EvolutionPhase {
     return !!this.pokemon.customPokemonData.forge;
   }
 
-  override doEvolution(): void {
+  protected override async createEvolutionPreview(): Promise<PlayerPokemon> {
     const preview = new PokemonData(this.pokemon).toPokemon() as PlayerPokemon;
     preview.customPokemonData.forge!.stage = this.stage;
     preview.customPokemonData.forge!.baseStats = [...this.stats];
     preview.customPokemonData.types = [...this.types];
     preview.calculateStats();
-    preview
-      .loadAssets()
-      .then(() => {
-        this.configureSprite(preview, this.pokemonEvoSprite, false);
-        this.configureSprite(preview, this.pokemonEvoTintSprite, false);
-        this.playEvolutionAnimation(preview);
-      })
-      .catch(this.fail);
+    await preview.loadAssets();
+    return preview;
+  }
+
+  protected override onEvolutionPreviewError(error: unknown): void {
+    this.fail(error);
   }
 
   protected override async applyEvolution(): Promise<void> {
@@ -62,8 +60,9 @@ class ForgeEvolutionAnimation extends EvolutionPhase {
     // The waiting Forge growth phase owns its rewards and continuation.
   }
 
-  protected override getEvolutionDoneMessage(): string {
-    return `${this.pokemon.getNameToRender({ useIllusion: false })}의 진화가 완료됐다!`;
+  protected override getEvolvedPokemonDisplayName(): string {
+    // Partners retain their nickname and do not have a separate evolved species name yet.
+    return "새로운 모습";
   }
 
   override end(): void {
