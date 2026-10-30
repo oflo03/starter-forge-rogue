@@ -19,31 +19,36 @@ import { AugmentTier } from "./augments";
 export const FORGE_ENVIRONMENT_BENEFITS = [
   {
     key: "evil",
+    creator: "밤의장막",
     name: "악한 마음",
     tier: AugmentTier.PRISMATIC,
-    description: "어두운 오라에서 원인 불문 실제 HP 피해를 받지 않은 턴 종료 시 공격·특공 +1.",
+    description: "심야에서 원인 불문 실제 HP 피해를 받지 않은 턴 종료 시 공격·특공 +1.",
   },
   {
     key: "compress",
+    creator: "매캐한물결",
     name: "맹독압축",
     tier: AugmentTier.GOLD,
-    description: "독가스에서 독 타입 기술 피해 1.5배·필중. 방어·타입 무효·공중 등 회피 상태는 무시하지 않음.",
+    description: "가스 오염지대에서 독 타입 기술 피해 1.5배·필중. 방어·타입 무효·공중 등 회피 상태는 무시하지 않음.",
   },
   {
     key: "wall",
+    creator: "굴속퍼레이드",
     name: "흙벽",
     tier: AugmentTier.GOLD,
-    description: "개미굴 필드에서 받는 불꽃·비행 타입 공격 피해 절반.",
+    description: "앤트힐필드에서 받는 불꽃·비행 타입 공격 피해 절반.",
   },
   {
     key: "wind",
+    creator: "하늘뒤집기",
     name: "바람읽기",
     tier: AugmentTier.PRISMATIC,
     description:
-      "강풍이 상대 진영에 우선도를 준 턴 시작 시 자동 방어. 행동·PP 소모 없음. 연속 성공 시 다음 성공률 1/3, 1/9…; 일반 방어와 판정 공유.",
+      "광풍이 상대 진영에 우선도를 준 턴 시작 시 자동 방어. 행동·PP 소모 없음. 연속 성공 시 다음 성공률 1/3, 1/9…; 일반 방어와 판정 공유.",
   },
   {
     key: "miss",
+    creator: "안개너울",
     name: "헛발받기",
     tier: AugmentTier.PRISMATIC,
     description:
@@ -51,23 +56,32 @@ export const FORGE_ENVIRONMENT_BENEFITS = [
   },
   {
     key: "lightning",
+    creator: "번개소나기",
     name: "벼락저금",
     tier: AugmentTier.GOLD,
     description: "뇌우의 낙뢰 피해를 막고 충전. 다음 전기 공격 위력 2배, 중첩 없음.",
   },
-  { key: "corner", name: "코너워크", tier: AugmentTier.GOLD, description: "옥타곤 필드에서 스피드 2배." },
+  {
+    key: "corner",
+    creator: "링아웃러시",
+    name: "코너워크",
+    tier: AugmentTier.GOLD,
+    description: "옥타곤필드에서 스피드 2배.",
+  },
   {
     key: "paint",
+    creator: "새하얀물결",
     name: "밑그림",
     tier: AugmentTier.GOLD,
     description:
-      "화이트 페인트에서 원래 타입이 다른 공격기를 연속 사용하면 두 번째부터 위력 1.3배. 실제 타입은 노말 유지; 변화기를 쓰면 연속이 끊김.",
+      "프라이머필드에서 원래 타입이 다른 공격기를 연속 사용하면 두 번째부터 위력 1.3배. 실제 타입은 노말 유지; 변화기를 쓰면 연속이 끊김.",
   },
   {
     key: "clock",
+    creator: "늪의손짓",
     name: "진흙시계",
     tier: AugmentTier.GOLD,
-    description: "스왐프 카운트가 감소한 턴 공격·특공 +1. 비로 2가 줄어도 턴당 한 번. 카운트 0의 기절은 유지.",
+    description: "스왐프필드 카운트가 감소한 턴 공격·특공 +1. 비로 2가 줄어도 턴당 한 번. 카운트 0의 기절은 유지.",
   },
 ] as const;
 export type ForgeEnvironmentBenefit = (typeof FORGE_ENVIRONMENT_BENEFITS)[number]["key"];

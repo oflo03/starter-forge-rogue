@@ -38,6 +38,7 @@ import {
   abilityAugmentChoices,
   customAbilityChoices,
   customMoveChoices,
+  environmentCreatorForAbility,
   starterAbility,
   starterMoves,
 } from "./registry";
@@ -379,7 +380,14 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
           abilityAugmentChoices(growthTypes(pokemon), stats, rollSeed, rarity, [
             ...equipped,
             ...excluded.map(value => value.id),
-          ]).map(o => ({ name: o.name, description: o.description, value: o }));
+          ]).map(o => {
+            const creator = environmentCreatorForAbility(o.id);
+            return {
+              name: o.name,
+              description: o.description + (creator === undefined ? "" : `\n연계 기술: ${allMoves[creator].name}`),
+              value: o,
+            };
+          });
         const choice = await chooseCards(`${name} · 특성`, makeOptions(seed), seed, makeOptions);
         if (passive) {
           pokemon.customPokemonData.passive = choice.id;
@@ -399,6 +407,13 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
         }
         if (pokemon.isOnField() && pokemon.hp > 0) {
           applyAbAttrs("PostSummonAbAttr", { pokemon });
+        }
+        const creator = environmentCreatorForAbility(
+          choice.id,
+          pokemon.getMoveset(true).map(move => move.moveId),
+        );
+        if (creator !== undefined) {
+          await learnForgeMove(pokemon, creator);
         }
       }
       if (level === 46 && !data.ivReward) {

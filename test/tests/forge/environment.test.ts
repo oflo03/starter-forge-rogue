@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
+import { AugmentTier } from "#app/forge/augments";
 import {
   clearForgeGasWithWind,
   FORGE_TERRAINS,
@@ -12,8 +14,8 @@ import { forgeGalePriority } from "#app/forge/environment-abilities";
 import { customMoveChoices, customPassiveChoices, initializeForgeRegistry } from "#app/forge/registry";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { CustomPokemonData, PokemonSummonData } from "#data/pokemon-data";
-import { Terrain, TerrainType } from "#data/terrain";
-import { getWeatherMultiplierForMove, Weather } from "#data/weather";
+import { getTerrainName, Terrain, TerrainType } from "#data/terrain";
+import { getCustomWeatherName, getWeatherMultiplierForMove, Weather } from "#data/weather";
 import { AbilityId } from "#enums/ability-id";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
@@ -29,6 +31,16 @@ import Phaser from "phaser";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("Forge native environments and reward slots", () => {
+  it("uses the requested custom environment display names", () => {
+    expect([WeatherType.DARK_AURA, WeatherType.GALE, WeatherType.POISON_GAS].map(getCustomWeatherName)).toEqual([
+      "심야",
+      "광풍",
+      "가스 오염지대",
+    ]);
+    expect(
+      [TerrainType.ANTHILL, TerrainType.OCTAGON, TerrainType.WHITE_PAINT, TerrainType.SWAMP].map(getTerrainName),
+    ).toEqual(["앤트힐필드", "옥타곤필드", "프라이머필드", "스왐프필드"]);
+  });
   let phaser: Phaser.Game;
   let game: GameManager;
   beforeAll(() => {
@@ -258,6 +270,7 @@ describe("Forge native environments and reward slots", () => {
           [],
           MoveCategory.PHYSICAL,
           level,
+          AugmentTier.SILVER,
         );
         expect(choices).toHaveLength(3);
         if (level >= 31) {

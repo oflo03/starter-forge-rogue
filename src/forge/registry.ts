@@ -527,7 +527,7 @@ function initializeGradedMoves(): void {
       move.id = allMoves.length as MoveId;
       move.power = power;
       move.chance = chance;
-      move.pp = original.pp + (tier === AugmentTier.PRISMATIC ? 5 : 0);
+      move.pp = original.pp + (tier === AugmentTier.PRISMATIC && original.category !== MoveCategory.STATUS ? 5 : 0);
       // Reuse the base move's effects; only power, PP and chance differ.
       Object.defineProperty(move, "localize", {
         value: () => {
@@ -980,7 +980,9 @@ export function customMoveChoices(
       types.includes(move.type)
       && move.rewardStage === (["weather", "terrain"].includes(move.source.templateId) ? 2 : 0)
       && (move.category !== MoveCategory.STATUS || move.source.id.endsWith(`-${MoveCategory.PHYSICAL}`))
-      && (move.augmentTier ?? AugmentTier.GOLD) === augmentTier
+      && (move.category === MoveCategory.STATUS
+        ? augmentTier === AugmentTier.SILVER && move.augmentTier === undefined
+        : (move.augmentTier ?? AugmentTier.GOLD) === augmentTier)
       && !excludedIds.includes(move.id)
       && !learnedFamilies.has(moveFamily(move.source))
       && (!move.source.alwaysCrit
@@ -1054,16 +1056,36 @@ export function forgeMoveCatalog() {
   return registeredMoves
     .filter(move => move.rewardStage === (["weather", "terrain"].includes(move.source.templateId) ? 2 : 0))
     .filter(move => move.category !== MoveCategory.STATUS || move.source.id.endsWith(`-${MoveCategory.PHYSICAL}`))
+    .filter(move => move.category !== MoveCategory.STATUS || move.augmentTier === undefined)
     .map(({ source, rewardStage: _rewardStage, ...move }) => ({
       ...move,
       templateId: source.templateId,
       alwaysCrit: source.alwaysCrit ?? false,
-      augmentTier: move.augmentTier ?? AugmentTier.GOLD,
+      augmentTier: move.category === MoveCategory.STATUS ? AugmentTier.SILVER : (move.augmentTier ?? AugmentTier.GOLD),
       accuracy: allMoves[move.id].accuracy,
       pp: allMoves[move.id].pp,
       chance: allMoves[move.id].chance,
       priority: allMoves[move.id].priority,
     }));
+}
+
+/** Associated creator is a fixed Silver move, even when the ability itself is Gold/Prismatic. */
+export function environmentCreatorForAbility(ability: AbilityId, known: readonly MoveId[] = []): MoveId | undefined {
+  initializeForgeRegistry();
+  const definition = FORGE_ENVIRONMENT_BENEFITS.find(entry => forgeEnvironmentBenefitIds.get(entry.key) === ability);
+  if (!definition) {
+    return;
+  }
+  const creator = registeredMoves.find(
+    move => move.name === definition.creator && move.rewardStage === 2 && move.augmentTier === undefined,
+  );
+  if (
+    !creator
+    || registeredMoves.some(move => known.includes(move.id) && moveFamily(move.source) === moveFamily(creator.source))
+  ) {
+    return;
+  }
+  return creator.id;
 }
 
 export function customAbilityChoices(

@@ -2,7 +2,12 @@
 import { AugmentTier, rollAugmentTier } from "#app/forge/augments";
 import { FORGE_ENVIRONMENT_BENEFITS } from "#app/forge/environment-abilities";
 import { FORGE_ABILITY_LEVELS, FORGE_MOVE_LEVELS } from "#app/forge/progression";
-import { abilityAugmentChoices, customMoveChoices, forgeMoveCatalog } from "#app/forge/registry";
+import {
+  abilityAugmentChoices,
+  customMoveChoices,
+  environmentCreatorForAbility,
+  forgeMoveCatalog,
+} from "#app/forge/registry";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { CustomPokemonData } from "#data/pokemon-data";
 import { AbilityId } from "#enums/ability-id";
@@ -16,7 +21,7 @@ describe("Forge augment grades and shared ability pool", () => {
   it("publishes every current creative move family with actual registered combat values", () => {
     const catalog = forgeMoveCatalog();
     expect(new Set(catalog.map(move => `${move.name}:${move.type}:${move.category}`)).size).toBe(213);
-    expect(catalog).toHaveLength(213 * 3);
+    expect(catalog).toHaveLength(204 * 3 + 9);
     expect(new Set(catalog.map(move => `${move.name}:${move.type}:${move.category}:${move.augmentTier}`)).size).toBe(
       catalog.length,
     );
@@ -29,23 +34,54 @@ describe("Forge augment grades and shared ability pool", () => {
   });
   it("uses one status-only creator per environment and grade, including legacy learned IDs", () => {
     const environments = forgeMoveCatalog().filter(move => ["weather", "terrain"].includes(move.templateId));
-    expect(environments).toHaveLength(9 * 3);
+    expect(environments).toHaveLength(9);
     expect(environments.every(move => move.category === MoveCategory.STATUS && move.power <= 0)).toBe(true);
     const setters = allMoves.filter(
       move => MoveId[move.id] === undefined && (move.hasAttr("WeatherChangeAttr") || move.hasAttr("TerrainChangeAttr")),
     );
     expect(setters.length).toBeGreaterThan(27);
+    expect(setters.every(move => move.pp === 10)).toBe(true);
     expect(
       setters.every(move => move.category === MoveCategory.STATUS && move.power <= 0 && move.is("StatusMove")),
     ).toBe(true);
-    for (const creator of environments.filter(move => move.augmentTier === AugmentTier.GOLD)) {
+    for (const creator of environments) {
       const legacy = setters.find(move => move.name === creator.name && move.id !== creator.id)!;
       expect(
-        customMoveChoices([creator.type], stats, "legacy-creator", [legacy.id]).every(
-          move => move.name !== creator.name,
-        ),
+        customMoveChoices(
+          [creator.type],
+          stats,
+          "legacy-creator",
+          [legacy.id],
+          undefined,
+          11,
+          AugmentTier.SILVER,
+        ).every(move => move.name !== creator.name),
       ).toBe(true);
     }
+  });
+  it("offers fixed Silver creators only and links all nine environment benefits", () => {
+    const catalog = forgeMoveCatalog();
+    const creators = catalog.filter(move => move.category === MoveCategory.STATUS);
+    expect(creators.every(move => move.augmentTier === AugmentTier.SILVER && move.pp === 10)).toBe(true);
+    for (const creator of creators) {
+      for (const tier of [AugmentTier.GOLD, AugmentTier.PRISMATIC]) {
+        expect(
+          customMoveChoices([creator.type], stats, "no-high-creators", [], undefined, 11, tier).every(
+            move => move.category !== MoveCategory.STATUS,
+          ),
+        ).toBe(true);
+      }
+    }
+    for (const benefit of FORGE_ENVIRONMENT_BENEFITS) {
+      const choice = [...abilityAugmentChoices([PokemonType.FIRE], stats, "links", benefit.tier)];
+      const ability = allAbilities.find(a => a.name === benefit.name)!;
+      const id = environmentCreatorForAbility(ability.id)!;
+      expect(allMoves[id].name).toBe(benefit.creator);
+      expect(creators.some(move => move.id === id)).toBe(true);
+      expect(environmentCreatorForAbility(ability.id, [id])).toBeUndefined();
+      expect(choice).toHaveLength(3);
+    }
+    expect(environmentCreatorForAbility(AbilityId.BLAZE)).toBeUndefined();
   });
   it("offers the same move IDs, effects and powers at every reward level", () => {
     for (let type = PokemonType.NORMAL; type <= PokemonType.FAIRY; type++) {

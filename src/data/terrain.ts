@@ -50,13 +50,13 @@ export function getTerrainName(terrainType: TerrainType): string {
     case TerrainType.PSYCHIC:
       return i18next.t("terrain:psychic");
     case TerrainType.ANTHILL:
-      return "개미굴 필드";
+      return "앤트힐필드";
     case TerrainType.OCTAGON:
-      return "옥타곤 필드";
+      return "옥타곤필드";
     case TerrainType.WHITE_PAINT:
-      return "화이트 페인트 필드";
+      return "프라이머필드";
     case TerrainType.SWAMP:
-      return "스왐프 필드";
+      return "스왐프필드";
     case TerrainType.NONE:
       return "";
   }

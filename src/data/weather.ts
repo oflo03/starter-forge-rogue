@@ -20,10 +20,10 @@ export interface SerializedWeather {
 export function getCustomWeatherName(type: WeatherType): string | undefined {
   return (
     {
-      [WeatherType.DARK_AURA]: "어두운 오라",
-      [WeatherType.GALE]: "강풍",
+      [WeatherType.DARK_AURA]: "심야",
+      [WeatherType.GALE]: "광풍",
       [WeatherType.SILENT_MIST]: "조용한 안개",
-      [WeatherType.POISON_GAS]: "독가스",
+      [WeatherType.POISON_GAS]: "가스 오염지대",
       [WeatherType.THUNDERSTORM]: "뇌우",
     } as Partial<Record<WeatherType, string>>
   )[type];
@@ -177,7 +177,7 @@ export function getWeatherLapseMessage(weatherType: Exclude<WeatherType, Weather
 
 export function getWeatherDamageMessage(weatherType: WeatherType, pokemon: Pokemon): string {
   if (weatherType === WeatherType.POISON_GAS) {
-    return `${getPokemonNameWithAffix(pokemon)}는 독가스에 피해를 입었다!`;
+    return `${getPokemonNameWithAffix(pokemon)}는 가스 오염지대에 피해를 입었다!`;
   }
   switch (weatherType) {
     case WeatherType.SANDSTORM:
@@ -236,7 +236,7 @@ export function getLegendaryWeatherContinuesMessage(weatherType: WeatherType): s
 
 export function getWeatherBlockMessage(weatherType: WeatherType): string {
   if (weatherType === WeatherType.POISON_GAS) {
-    return "독가스 속에서 기술이 터져 버렸다!";
+    return "가스 오염지대 속에서 기술이 터져 버렸다!";
   }
   switch (weatherType) {
     case WeatherType.HARSH_SUN:

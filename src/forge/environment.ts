@@ -23,14 +23,14 @@ export const FORGE_WEATHERS = [
     name: "어둠내림",
     move: "밤의장막",
     description:
-      "5턴 어두운 오라. 악 피해 1.2배·페어리 피해 절반. 솔라빔 위력 절반·아침햇살/달빛/광합성 회복 1/4. 웨더볼은 악.",
+      "5턴 심야. 악 피해 1.2배·페어리 피해 절반. 솔라빔 위력 절반·아침햇살/달빛/광합성 회복 1/4. 웨더볼은 악.",
   },
   {
     type: WeatherType.GALE,
     affinity: [PokemonType.FLYING],
     name: "바람몰이",
     move: "하늘뒤집기",
-    description: "5턴 강풍. 매 턴 무작위 한쪽 진영의 기술 우선도 +3. 웨더볼은 비행.",
+    description: "5턴 광풍. 매 턴 무작위 한쪽 진영의 기술 우선도 +3. 웨더볼은 비행.",
   },
   {
     type: WeatherType.SILENT_MIST,
@@ -46,7 +46,7 @@ export const FORGE_WEATHERS = [
     name: "매캐한숨",
     move: "매캐한물결",
     description:
-      "5턴 독가스. 독 타입 매 턴 HP 1/16 회복, 독·강철 외 1/16 피해. 소리 기술·기충전·용의숨결은 실패하고 사용자 HP 1/8 피해. 바람 기술로 해제. 웨더볼은 독.",
+      "5턴 가스 오염지대. 독 타입 매 턴 HP 1/16 회복, 독·강철 외 1/16 피해. 소리 기술·기충전·용의숨결은 실패하고 사용자 HP 1/8 피해. 바람 기술로 해제. 웨더볼은 독.",
   },
   {
     type: WeatherType.THUNDERSTORM,
@@ -64,14 +64,14 @@ export const FORGE_TERRAINS = [
     affinity: [PokemonType.BUG, PokemonType.GROUND],
     name: "개미굴메이커",
     move: "굴속퍼레이드",
-    description: "5턴 개미굴 필드. 모두 스킬링크 효과. 벌레 피해 1.2배. 땅·벌레 타입의 회피율 +1랭크 보정.",
+    description: "5턴 앤트힐필드. 모두 스킬링크 효과. 벌레 피해 1.2배. 땅·벌레 타입의 회피율 +1랭크 보정.",
   },
   {
     type: TerrainType.OCTAGON,
     affinity: [PokemonType.FIGHTING],
     name: "옥타곤메이커",
     move: "링아웃러시",
-    description: "5턴 옥타곤 필드. 격투 피해 1.2배. 교체 불가. 회피율 보정을 무시하지만 기술 명중률은 적용.",
+    description: "5턴 옥타곤필드. 격투 피해 1.2배. 교체 불가. 회피율 보정을 무시하지만 기술 명중률은 적용.",
   },
   {
     type: TerrainType.WHITE_PAINT,
@@ -79,7 +79,7 @@ export const FORGE_TERRAINS = [
     name: "화이트메이커",
     move: "새하얀물결",
     description:
-      "5턴 화이트 페인트 필드. 모든 포켓몬·기술이 노말 타입. 스킨·타입 변경 특성/도구 무효. 웨더볼·대지의파동 위력 증가는 유지.",
+      "5턴 프라이머필드. 모든 포켓몬·기술이 노말 타입. 스킨·타입 변경 특성/도구 무효. 웨더볼·대지의파동 위력 증가는 유지.",
   },
   {
     type: TerrainType.SWAMP,
@@ -87,7 +87,7 @@ export const FORGE_TERRAINS = [
     name: "스왐프메이커",
     move: "늪의손짓",
     description:
-      "5턴 스왐프 필드. 접지한 물·땅 외 스피드 절반. 접지한 모두 5카운트, 턴마다 -1·비에는 -2, 0이면 기절. 비접지·교체·필드 해제로 초기화. 물·땅도 카운트 적용.",
+      "5턴 스왐프필드. 접지한 물·땅 외 스피드 절반. 접지한 모두 5카운트, 턴마다 -1·비에는 -2, 0이면 기절. 비접지·교체·필드 해제로 초기화. 물·땅도 카운트 적용.",
   },
 ] as const;
 
@@ -112,7 +112,7 @@ function indirectDamage(pokemon: Pokemon, amount: number, message: string): void
 }
 
 export function forgeGasBackfire(pokemon: Pokemon): void {
-  indirectDamage(pokemon, pokemon.getMaxHp() / 8, `${pokemon.name}는 독가스 폭발에 휘말렸다!`);
+  indirectDamage(pokemon, pokemon.getMaxHp() / 8, `${pokemon.name}는 가스 오염지대 폭발에 휘말렸다!`);
 }
 
 /** WeatherEffectPhase owns ordinary gas damage; these are its extra weather effects. */
@@ -125,7 +125,7 @@ export function forgeWeatherTick(pokemon: Pokemon): void {
       "PokemonHealPhase",
       pokemon.getBattlerIndex(),
       toDmgValue(pokemon.getMaxHp() / 16),
-      { message: `${pokemon.name}는 독가스로 회복했다!` },
+      { message: `${pokemon.name}는 가스 오염지대로 회복했다!` },
     );
   }
   if (globalScene.arena.weatherType === WeatherType.THUNDERSTORM && pokemon.randBattleSeedInt(3) === 0) {
