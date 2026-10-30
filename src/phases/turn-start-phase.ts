@@ -1,11 +1,13 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import type { TurnCommand } from "#app/battle";
-import { forgeAutomaticProtect } from "#app/forge/environment-abilities";
+import { forgeWeatherActive } from "#app/forge/environment";
+import { forgeAutomaticProtect, forgeGalePriority } from "#app/forge/environment-abilities";
 import { globalScene } from "#app/global-scene";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import type { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { SwitchType } from "#enums/switch-type";
+import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import { BypassSpeedChanceModifier } from "#modifiers/modifier";
 import { PokemonMove } from "#moves/pokemon-move";
@@ -51,6 +53,14 @@ export class TurnStartPhase extends FieldPhase {
   // Also need a clearer distinction between "turn command" and queued moves
   start() {
     super.start();
+
+    // Reveal the direction only after all battlers have committed their commands.
+    const first = globalScene.getPlayerField(true)[0];
+    if (first && forgeWeatherActive(WeatherType.GALE)) {
+      globalScene.phaseManager.queueMessage(
+        `광풍이 ${forgeGalePriority(first) > 0 ? "아군" : "상대"} 쪽으로 불어 기술 우선도가 3 올랐다!`,
+      );
+    }
 
     const field = globalScene.getField();
     const moveOrder = this.getCommandOrder();

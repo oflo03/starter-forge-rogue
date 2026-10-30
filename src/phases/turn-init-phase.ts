@@ -1,8 +1,5 @@
-import { forgeWeatherActive } from "#app/forge/environment";
-import { forgeGalePriority } from "#app/forge/environment-abilities";
 import { globalScene } from "#app/global-scene";
 import { BattlerIndex } from "#enums/battler-index";
-import { WeatherType } from "#enums/weather-type";
 import { TurnInitEvent } from "#events/battle-scene";
 import type { PlayerPokemon } from "#field/pokemon";
 import {
@@ -50,13 +47,6 @@ export class TurnInitPhase extends FieldPhase {
     });
 
     globalScene.eventTarget.dispatchEvent(new TurnInitEvent());
-    const first = globalScene.getPlayerField(true)[0];
-    if (first && forgeWeatherActive(WeatherType.GALE)) {
-      globalScene.phaseManager.queueMessage(
-        `${forgeGalePriority(first) > 0 ? "아군" : "상대"} 쪽에 순풍이 불어 우선도가 3 올랐다!`,
-      );
-    }
-
     handleMysteryEncounterBattleStartEffects();
 
     // If true, will skip remainder of current phase (and not queue CommandPhases etc.)

@@ -149,6 +149,22 @@ describe("Forge native battle phase integration", () => {
     await game.phaseInterceptor.to("CommandPhase");
     expect(p.getStatStage(Stat.ATK)).toBe(2);
   });
+  it("reveals gale direction only after commands are committed, on each turn", async () => {
+    game.override.weather(WeatherType.GALE).moveset(MoveId.SPLASH);
+    const messages = vi.spyOn(game.scene.phaseManager, "queueMessage");
+    const announcements = () => messages.mock.calls.filter(([text]) => text.includes("우선도가 3 올랐다"));
+    await game.classicMode.startBattle(SpeciesId.EEVEE);
+    expect(announcements()).toHaveLength(0);
+    for (let turn = 1; turn <= 2; turn++) {
+      const favored = forgeGalePriority(game.field.getPlayerPokemon()) > 0 ? "아군" : "상대";
+      game.move.select(MoveId.SPLASH);
+      await game.phaseInterceptor.to("TurnEndPhase");
+      expect(announcements()).toHaveLength(turn);
+      expect(announcements().at(-1)![0]).toContain(favored);
+      await game.phaseInterceptor.to("CommandPhase");
+      expect(announcements()).toHaveLength(turn);
+    }
+  });
   it("wind reading protects before the priority attack without replacing the selected action", async () => {
     game.override.ability(AbilityId.NONE).weather(WeatherType.GALE).moveset(MoveId.SPLASH).enemyMoveset(MoveId.TACKLE);
     await game.classicMode.startBattle(SpeciesId.EEVEE);

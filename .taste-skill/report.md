@@ -71,3 +71,6 @@ All custom environment move IDs, including old learned attacks and graded IDs, a
 
 ## Latest override: fixed Silver creators, linked learning and environment names
 Only the9status creators lose grade variation: fixed PP10, canonical base ID drawn only for Silver. Old saved Silver/Prismatic setter IDs also now have PP10; attack grades remain unchanged. Corresponding9creative environment benefit abilities/passives offer their creator through original learn/replace/decline UI, skipping known family includinglegacy IDs; abilitycards list linked move. States renamed to 심야/광풍/가스 오염지대/앤트힐필드/옥타곤필드/프라이머필드/스왐프필드; only state labels/messages/descriptions changed, native move독가스 and creator ability proper names unchanged. Catalog213families/621variants(204attacks*3+9status),9linktable current.
+
+## Latest fix: conceal Gale direction until commands are committed
+Moved the side/priority announcement from TurnInitPhase (before CommandPhase) to TurnStartPhase (after both commands). Direction calculation, priority and automatic wind protection unchanged. Regression reproduced pre-fix direction leak and now checks two consecutive turns: zero new announcement during command selection, exactly one correct-side announcement afterward. Native battle/environment/benefit42tests PASS.
