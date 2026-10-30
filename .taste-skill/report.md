@@ -50,3 +50,6 @@ Final type choice now follows the user's final override: directly show three dis
 
 ## 2026-10-30: ability21/passive41 and competitive ability pool
 Move-only drafts11/31/51;21activeability and41passive use the same165native+9customenvironment pool.16evolution-only;26noevent;36type/evolution and46IV unchanged. Native pixel card UI and per-card2 rerolls stay. Nonenvironment custom4 removed from new rewards, old IDs/effects retained. Tier mapping reviewed for60-wave PvE:39silver/102gold/33prismatic includingenvironmentcreators. Slot reward flags preserve old16/26grants and distinguish historical21/41move histories from newly owed ability grants. Public Korean catalog contains methodology, source links, exclusions and current levels.
+
+## 2026-10-30: exact user tier list
+Replace curated pool with user-provided250original entries; explicit subsequent override movesMagnetPull/CottonDown toSilver. Illusion remainsGoldlisted but excludedfromdrafts by explicituseranswer due nativeunimplemented. Active118Silver/107Gold(inclall9customenvironmentcreators)/33Prism=258. ExplicitSandSpit/SeedSowerSilver andPrimalweather/Orichalcum/HadronPrism overridegeneralGoldcreatorrule. Existingnativeeffects/IDs and21/41slots unchanged. New weather/terrain-benefit ability request is proposal-only: DO NOT implement or append newtraits without userselection.

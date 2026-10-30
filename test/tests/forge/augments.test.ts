@@ -39,7 +39,7 @@ describe("Forge augment grades and shared ability pool", () => {
     const collected: Set<AbilityId>[] = [];
     for (const tier of [AugmentTier.SILVER, AugmentTier.GOLD, AugmentTier.PRISMATIC]) {
       const all = new Set<AbilityId>();
-      for (let i = 0; i < 100; i++) {
+      for (let i = 0; i < 1000; i++) {
         const choices = abilityAugmentChoices([PokemonType.FIRE], stats, `pool-${i}`, tier);
         expect(choices).toHaveLength(3);
         choices.forEach(choice => all.add(choice.id));
@@ -60,14 +60,49 @@ describe("Forge augment grades and shared ability pool", () => {
       }
       collected.push(all);
     }
-    expect(collected[0].has(AbilityId.PARENTAL_BOND)).toBe(false);
-    expect(collected[1].has(AbilityId.REGENERATOR)).toBe(false);
-    expect(collected[2].has(AbilityId.REGENERATOR)).toBe(true);
-    expect(collected[2].has(AbilityId.SPEED_BOOST)).toBe(true);
-    expect(collected[1].has(AbilityId.FLUFFY)).toBe(true);
-    expect(collected[0].has(AbilityId.DROUGHT)).toBe(false);
-    expect(collected[1].has(AbilityId.DROUGHT)).toBe(true);
-    expect(collected[2].has(AbilityId.PARENTAL_BOND)).toBe(true);
+    expect(collected.map(pool => pool.size)).toEqual([118, 107, 33]);
+    for (const id of [
+      AbilityId.MAGNET_PULL,
+      AbilityId.COTTON_DOWN,
+      AbilityId.DAUNTLESS_SHIELD,
+      AbilityId.IRON_BARBS,
+      AbilityId.SAND_SPIT,
+      AbilityId.SEED_SOWER,
+      AbilityId.ILLUMINATE,
+    ]) {
+      expect(collected[0].has(id)).toBe(true);
+      expect(collected[1].has(id)).toBe(false);
+    }
+    for (const id of [
+      AbilityId.REGENERATOR,
+      AbilityId.SPEED_BOOST,
+      AbilityId.PARENTAL_BOND,
+      AbilityId.SOUL_HEART,
+      AbilityId.CONTRARY,
+      AbilityId.SIMPLE,
+      AbilityId.DROUGHT,
+    ]) {
+      expect(collected[1].has(id)).toBe(true);
+      expect(collected[2].has(id)).toBe(false);
+    }
+    for (const id of [
+      AbilityId.MULTISCALE,
+      AbilityId.SHADOW_SHIELD,
+      AbilityId.NEUTRALIZING_GAS,
+      AbilityId.PROTOSYNTHESIS,
+      AbilityId.QUARK_DRIVE,
+      AbilityId.PRIMORDIAL_SEA,
+      AbilityId.DELTA_STREAM,
+      AbilityId.CHILLING_NEIGH,
+      AbilityId.GRIM_NEIGH,
+      AbilityId.OPPORTUNIST,
+    ]) {
+      expect(collected[2].has(id)).toBe(true);
+    }
+    expect(collected.every(pool => !pool.has(AbilityId.ILLUSION))).toBe(true);
+    expect(collected.flatMap(pool => [...pool]).filter(id => !AbilityId[id])).toHaveLength(9);
+    expect([...collected[1]].filter(id => !AbilityId[id])).toHaveLength(9);
+    expect(collected.every(pool => !pool.has(AbilityId.SPICY_SPRAY))).toBe(true);
   });
 
   it("changes real learned move power and PP by grade while preserving effects and critical caps", () => {
