@@ -184,6 +184,9 @@ describe("Forge original engine registry", () => {
     expect(MoveId[saved.moveId]).toBeDefined();
     expect(saved.getMove()).toBe(allMoves[saved.moveId]);
     expect(saved.ppUsed).toBe(2);
+    const exhausted = PokemonMove.loadMove({ moveId: legacy, ppUsed: 999, ppUp: 0 });
+    expect(exhausted.ppUsed).toBe(exhausted.getMovePp());
+    expect(exhausted.getPpRatio()).toBe(0);
   });
 
   it("offers stronger awakenings as new IDs and preserves core ability identities", () => {

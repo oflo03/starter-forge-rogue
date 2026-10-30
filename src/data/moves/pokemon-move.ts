@@ -44,6 +44,9 @@ export class PokemonMove {
     this.ppUsed = ppUsed;
     this.ppUp = ppUp;
     this.maxPpOverride = maxPpOverride;
+    if (this.moveId !== moveId) {
+      this.ppUsed = Math.min(this.ppUsed, this.getMovePp());
+    }
   }
 
   /**
