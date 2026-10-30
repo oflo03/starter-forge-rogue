@@ -32,6 +32,8 @@ export interface ForgePokemonData {
   name?: string;
   body?: ForgeBody;
   ivReward?: boolean;
+  abilityReward?: boolean;
+  passiveReward?: boolean;
 }
 
 /** Discard malformed saved Forge data rather than passing invalid stats to battle calculations. */
@@ -48,9 +50,11 @@ function copyForgePokemonData(data: unknown): ForgePokemonData | undefined {
     || !candidate.baseStats.every(value => Number.isInteger(value) && value >= 1 && value <= 255)
     || ![1, 2, 3].includes(candidate.stage ?? 0)
     || !Array.isArray(candidate.events)
-    || !candidate.events.every(value => FORGE_MILESTONES.includes(value) || value === 56)
+    || !candidate.events.every(value => FORGE_MILESTONES.includes(value) || value === 26 || value === 56)
     || (candidate.name !== undefined && typeof candidate.name !== "string")
     || (candidate.ivReward !== undefined && typeof candidate.ivReward !== "boolean")
+    || (candidate.abilityReward !== undefined && typeof candidate.abilityReward !== "boolean")
+    || (candidate.passiveReward !== undefined && typeof candidate.passiveReward !== "boolean")
   ) {
     return undefined;
   }
@@ -59,6 +63,9 @@ function copyForgePokemonData(data: unknown): ForgePokemonData | undefined {
     baseStats: [...candidate.baseStats],
     stage: candidate.stage as ForgePokemonData["stage"],
     events: [...new Set(candidate.events)],
+    // Old saves granted these at 16/26; explicit false distinguishes new evolution-only level 16.
+    abilityReward: candidate.abilityReward ?? candidate.events.includes(16),
+    passiveReward: candidate.passiveReward ?? candidate.events.includes(26),
     ...(candidate.ivReward || candidate.events.includes(56) ? { ivReward: true } : {}),
     ...(candidate.name === undefined ? {} : { name: candidate.name }),
     ...(FORGE_BODIES.includes(candidate.body as ForgeBody) ? { body: candidate.body as ForgeBody } : {}),

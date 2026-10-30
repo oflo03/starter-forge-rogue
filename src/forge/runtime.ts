@@ -156,7 +156,15 @@ export function configureForgePartner(pokemon: PlayerPokemon, seed: string, type
   pokemon.customPokemonData = new CustomPokemonData({
     ability: starterAbility(type),
     types: [type as RegularPokemonType, null],
-    forge: { seed, baseStats: evolutionStats(finalStats(seed), 1), stage: 1, events: [], body: forgeBodyForSeed(seed) },
+    forge: {
+      seed,
+      baseStats: evolutionStats(finalStats(seed), 1),
+      stage: 1,
+      events: [],
+      body: forgeBodyForSeed(seed),
+      abilityReward: false,
+      passiveReward: false,
+    },
   });
   pokemon.moveset = starterMoves(type).map(id => new PokemonMove(id));
   pokemon.pauseEvolutions = true;
@@ -315,12 +323,13 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
   try {
     const stats = finalStats(data.seed);
     for (const level of FORGE_MILESTONES) {
-      const missingPassive = level === 26 && pokemon.customPokemonData.passive === -1;
+      const missingAbility = level === 21 && !data.abilityReward;
+      const missingPassive = level === 41 && (!data.passiveReward || pokemon.customPokemonData.passive === -1);
       const missingIvs = level === 46 && !data.ivReward;
       if (
         level <= previousLevel
         || level > pokemon.level
-        || (data.events.includes(level) && !missingPassive && !missingIvs)
+        || (data.events.includes(level) && !missingAbility && !missingPassive && !missingIvs)
       ) {
         continue;
       }
@@ -389,8 +398,8 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
           await initMoveAnim(id);
           pokemon.moveset[slot] = new PokemonMove(id);
         }
-      } else if (FORGE_ABILITY_LEVELS.includes(level)) {
-        const passive = level === 26;
+      } else if (FORGE_ABILITY_LEVELS.includes(level) && (level === 21 ? missingAbility : missingPassive)) {
+        const passive = level === 41;
         const equipped = [pokemon.customPokemonData.ability, pokemon.customPokemonData.passive].filter(id => id >= 0);
         const makeOptions = (rollSeed: string, excluded: any[] = []) =>
           abilityAugmentChoices(growthTypes(pokemon), stats, rollSeed, rarity, [
@@ -401,8 +410,10 @@ export async function forgeGrowth(pokemon: PlayerPokemon, previousLevel: number)
         if (passive) {
           pokemon.customPokemonData.passive = choice.id;
           pokemon.passive = true;
+          data.passiveReward = true;
         } else {
           pokemon.customPokemonData.ability = choice.id;
+          data.abilityReward = true;
         }
         if (pokemon.isFusion()) {
           pokemon.fusionCustomPokemonData ??= new CustomPokemonData();

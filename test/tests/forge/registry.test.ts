@@ -31,7 +31,7 @@ describe("Forge original engine registry", () => {
       events: [11, 16, 21, 26, 31],
     };
     const copy = new CustomPokemonData({ forge });
-    expect(copy.forge).toEqual(forge);
+    expect(copy.forge).toEqual({ ...forge, abilityReward: true, passiveReward: true });
     copy.forge!.events.push(36);
     expect(forge.events).not.toContain(36);
     expect(new CustomPokemonData({ forge: { ...forge, events: [12] } }).forge).toBeUndefined();
