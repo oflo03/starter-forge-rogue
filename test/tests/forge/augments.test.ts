@@ -7,6 +7,7 @@ import { allAbilities, allMoves } from "#data/data-lists";
 import { CustomPokemonData } from "#data/pokemon-data";
 import { AbilityId } from "#enums/ability-id";
 import { MoveCategory } from "#enums/move-category";
+import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { describe, expect, it } from "vitest";
 
@@ -14,8 +15,8 @@ const stats = [90, 120, 80, 60, 80, 100];
 describe("Forge augment grades and shared ability pool", () => {
   it("publishes every current creative move family with actual registered combat values", () => {
     const catalog = forgeMoveCatalog();
-    expect(new Set(catalog.map(move => `${move.name}:${move.type}:${move.category}`)).size).toBe(222);
-    expect(catalog).toHaveLength(222 * 3);
+    expect(new Set(catalog.map(move => `${move.name}:${move.type}:${move.category}`)).size).toBe(213);
+    expect(catalog).toHaveLength(213 * 3);
     expect(new Set(catalog.map(move => `${move.name}:${move.type}:${move.category}:${move.augmentTier}`)).size).toBe(
       catalog.length,
     );
@@ -24,6 +25,26 @@ describe("Forge augment grades and shared ability pool", () => {
       expect(move.power).toBe(allMoves[move.id].power);
       expect(move.pp).toBe(allMoves[move.id].pp);
       expect(move.description).toBe(allMoves[move.id].effect);
+    }
+  });
+  it("uses one status-only creator per environment and grade, including legacy learned IDs", () => {
+    const environments = forgeMoveCatalog().filter(move => ["weather", "terrain"].includes(move.templateId));
+    expect(environments).toHaveLength(9 * 3);
+    expect(environments.every(move => move.category === MoveCategory.STATUS && move.power <= 0)).toBe(true);
+    const setters = allMoves.filter(
+      move => MoveId[move.id] === undefined && (move.hasAttr("WeatherChangeAttr") || move.hasAttr("TerrainChangeAttr")),
+    );
+    expect(setters.length).toBeGreaterThan(27);
+    expect(
+      setters.every(move => move.category === MoveCategory.STATUS && move.power <= 0 && move.is("StatusMove")),
+    ).toBe(true);
+    for (const creator of environments.filter(move => move.augmentTier === AugmentTier.GOLD)) {
+      const legacy = setters.find(move => move.name === creator.name && move.id !== creator.id)!;
+      expect(
+        customMoveChoices([creator.type], stats, "legacy-creator", [legacy.id]).every(
+          move => move.name !== creator.name,
+        ),
+      ).toBe(true);
     }
   });
   it("offers the same move IDs, effects and powers at every reward level", () => {

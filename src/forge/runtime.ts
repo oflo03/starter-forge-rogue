@@ -286,6 +286,9 @@ async function chooseCards(
 }
 function moveDescription(id: MoveId): string {
   const move = allMoves[id];
+  if (move.category === MoveCategory.STATUS) {
+    return `${typeName(move.type)} · 변화 · PP ${move.pp}\n${move.effect}`;
+  }
   const category = move.category === MoveCategory.PHYSICAL ? "물리" : "특수";
   const accuracy = move.accuracy < 0 ? "필중" : `${move.accuracy}%`;
   const priority = move.priority ? ` · 우선도 ${move.priority > 0 ? "+" : ""}${move.priority}` : "";

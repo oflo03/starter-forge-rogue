@@ -20,6 +20,7 @@ import type { TerrainType } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
+import { MoveTarget } from "#enums/move-target";
 import { MultiHitType } from "#enums/multi-hit-type";
 import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
@@ -36,9 +37,13 @@ import {
   MultiHitAttr,
   RecoilAttr,
   StatStageChangeAttr,
+  StatusMove,
   TerrainChangeAttr,
   WeatherChangeAttr,
 } from "#moves/move";
+// Catalog data supplies names and parameters; all battle effects below use upstream attributes.
+import Catalog from "../../forge/vendor/catalog.js";
+import Maker from "../../forge/vendor/engine.js";
 import { AugmentTier } from "./augments";
 import { FORGE_TERRAINS, FORGE_WEATHERS } from "./environment";
 import {
@@ -49,22 +54,6 @@ import {
   forgeLightningFollowup,
   forgePaintBoost,
 } from "./environment-abilities";
-
-/** Attack setters still deal damage when the same environment is already active. */
-class ForgeWeatherAttackAttr extends WeatherChangeAttr {
-  override getCondition() {
-    return () => true;
-  }
-}
-class ForgeTerrainAttackAttr extends TerrainChangeAttr {
-  override getCondition() {
-    return () => true;
-  }
-}
-
-// Catalog data supplies names and parameters; all battle effects below use upstream attributes.
-import Catalog from "../../forge/vendor/catalog.js";
-import Maker from "../../forge/vendor/engine.js";
 
 export interface ForgeMoveChoice {
   id: MoveId;
@@ -510,27 +499,29 @@ function initializeGradedMoves(): void {
     const original = allMoves[choice.id];
     for (const tier of [AugmentTier.SILVER, AugmentTier.PRISMATIC]) {
       const factor = tier === AugmentTier.SILVER ? 0.85 : 1.2;
-      const power = Math.min(
-        choice.source.alwaysCrit ? 70 : 240,
-        Math.max(5, Math.round((original.power * factor) / 5) * 5),
-      );
+      const power =
+        original.category === MoveCategory.STATUS
+          ? original.power
+          : Math.min(choice.source.alwaysCrit ? 70 : 240, Math.max(5, Math.round((original.power * factor) / 5) * 5));
       const chance =
         original.chance > 0 && original.chance < 100
           ? Math.min(100, Math.max(1, Math.round(original.chance * (tier === AugmentTier.SILVER ? 0.75 : 1.25))))
           : original.chance;
       const description = chance === original.chance ? original.effect : original.effect.replace(/\d+%/, `${chance}%`);
       const move = Object.assign(
-        new AttackMove(
-          MoveId.TACKLE,
-          original.type,
-          original.category,
-          power,
-          original.accuracy,
-          original.pp,
-          chance,
-          original.priority,
-          9,
-        ),
+        original.category === MoveCategory.STATUS
+          ? new StatusMove(MoveId.TACKLE, original.type, original.accuracy, original.pp, chance, original.priority, 9)
+          : new AttackMove(
+              MoveId.TACKLE,
+              original.type,
+              original.category,
+              power,
+              original.accuracy,
+              original.pp,
+              chance,
+              original.priority,
+              9,
+            ),
         original,
       );
       move.id = allMoves.length as MoveId;
@@ -544,7 +535,14 @@ function initializeGradedMoves(): void {
           move.effect = description;
         },
       });
-      Object.defineProperty(move, "forgeAnimation", { value: MoveId.TACKLE });
+      Object.defineProperty(move, "forgeAnimation", {
+        value:
+          original.category === MoveCategory.STATUS
+            ? choice.source.templateId === "weather"
+              ? MoveId.RAIN_DANCE
+              : MoveId.MISTY_TERRAIN
+            : MoveId.TACKLE,
+      });
       move.localize();
       (allMoves as Move[]).push(move);
       registeredMoves.push({ ...choice, id: move.id, power, description, augmentTier: tier });
@@ -600,15 +598,16 @@ function initializeEnvironmentRewards(): void {
     for (const category of [MoveCategory.PHYSICAL, MoveCategory.SPECIAL]) {
       for (let rewardStage = 2; rewardStage <= 4; rewardStage++) {
         const type = definition.affinity[0];
-        const power = 95 + (rewardStage - 2) * 15;
-        const move = new AttackMove(MoveId.TACKLE, type, category, power, 100, 10, -1, 0, 9);
+        const power = -1;
+        // Keep the old ID order for saves, but all old environment attacks now create only.
+        const move = new StatusMove(MoveId.TACKLE, type, -1, 10, -1, 0, 9).target(MoveTarget.BOTH_SIDES);
         if (weather) {
-          move.attr(ForgeWeatherAttackAttr, definition.type as WeatherType);
+          move.attr(WeatherChangeAttr, definition.type as WeatherType);
         } else {
-          move.attr(ForgeTerrainAttackAttr, definition.type as TerrainType);
+          move.attr(TerrainChangeAttr, definition.type as TerrainType);
         }
-        const name = definition.move + (category === MoveCategory.PHYSICAL ? "" : "탄");
-        const description = `공격 후 ${definition.description}`;
+        const name = definition.move;
+        const description = definition.description;
         move.id = allMoves.length as MoveId;
         Object.defineProperty(move, "localize", {
           value: () => {
@@ -616,7 +615,7 @@ function initializeEnvironmentRewards(): void {
             move.effect = description;
           },
         });
-        Object.defineProperty(move, "forgeAnimation", { value: MoveId.TACKLE });
+        Object.defineProperty(move, "forgeAnimation", { value: weather ? MoveId.RAIN_DANCE : MoveId.MISTY_TERRAIN });
         move.localize();
         (allMoves as Move[]).push(move);
         registeredMoves.push({
@@ -624,7 +623,7 @@ function initializeEnvironmentRewards(): void {
           name,
           description,
           type,
-          category,
+          category: MoveCategory.STATUS,
           power,
           rewardStage,
           source: {
@@ -958,6 +957,10 @@ function seededOrder<T>(items: T[], seed: string): T[] {
   return result;
 }
 
+function moveFamily(source: CatalogMove): string {
+  return ["weather", "terrain"].includes(source.templateId) ? source.id.replace(/-[01]$/, "") : source.id;
+}
+
 export function customMoveChoices(
   types: PokemonType[],
   stats: Stats,
@@ -970,15 +973,16 @@ export function customMoveChoices(
   initializeForgeRegistry();
   const [attack, special] = statsPair(stats);
   const learnedFamilies = new Set(
-    registeredMoves.filter(move => excludedIds.includes(move.id)).map(move => move.source.id),
+    registeredMoves.filter(move => excludedIds.includes(move.id)).map(move => moveFamily(move.source)),
   );
   const candidates = registeredMoves.filter(
     move =>
       types.includes(move.type)
       && move.rewardStage === (["weather", "terrain"].includes(move.source.templateId) ? 2 : 0)
+      && (move.category !== MoveCategory.STATUS || move.source.id.endsWith(`-${MoveCategory.PHYSICAL}`))
       && (move.augmentTier ?? AugmentTier.GOLD) === augmentTier
       && !excludedIds.includes(move.id)
-      && !learnedFamilies.has(move.source.id)
+      && !learnedFamilies.has(moveFamily(move.source))
       && (!move.source.alwaysCrit
         || (move.power <= 70 && (move.category === MoveCategory.PHYSICAL ? attack : special) <= 110)),
   );
@@ -1026,7 +1030,20 @@ export function customMoveChoices(
       && environment.type !== types[1]
       && choices.at(-1)?.type === types[1]
       && !choices.slice(0, -1).some(move => move.type === types[1]);
-    choices[keepsSecondary ? 1 : choices.length - 1] = environment;
+    const otherCategory = choices.findIndex(
+      (move, index) => move.category !== preferred && !(keepsSecondary && index === choices.length - 1),
+    );
+    const index = otherCategory >= 0 ? otherCategory : keepsSecondary ? 1 : choices.length - 1;
+    const keepsBurst =
+      choices[index].power < 100 || choices.some((move, other) => other !== index && move.power >= 100);
+    if (
+      keepsBurst
+      && (preferredCategory === undefined
+        || choices[index].category !== preferred
+        || choices.filter(move => move.category === preferred).length > 2)
+    ) {
+      choices[index] = environment;
+    }
   }
   return choices.map(({ source: _source, rewardStage: _stage, augmentTier: _tier, ...choice }) => choice);
 }
@@ -1036,6 +1053,7 @@ export function forgeMoveCatalog() {
   initializeForgeRegistry();
   return registeredMoves
     .filter(move => move.rewardStage === (["weather", "terrain"].includes(move.source.templateId) ? 2 : 0))
+    .filter(move => move.category !== MoveCategory.STATUS || move.source.id.endsWith(`-${MoveCategory.PHYSICAL}`))
     .map(({ source, rewardStage: _rewardStage, ...move }) => ({
       ...move,
       templateId: source.templateId,

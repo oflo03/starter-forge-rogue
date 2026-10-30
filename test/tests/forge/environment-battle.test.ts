@@ -35,9 +35,9 @@ describe("Forge native battle phase integration", () => {
   });
 
   it.each([...FORGE_WEATHERS, ...FORGE_TERRAINS])(
-    "$move deals damage and creates its environment, including repeated use",
+    "$move creates its environment without attack damage",
     async definition => {
-      const move = allMoves.find(move => move.name === definition.move && move.power === 95)!;
+      const move = allMoves.find(move => move.name === definition.move && move.power <= 0)!;
       expect(move).toBeDefined();
       game.override.moveset(MoveId.TACKLE);
       await game.classicMode.startBattle(SpeciesId.EEVEE);
@@ -46,16 +46,11 @@ describe("Forge native battle phase integration", () => {
       enemy.stats[Stat.HP] = 9999;
       enemy.hp = 9999;
       game.move.select(move.id);
-      await game.phaseInterceptor.to("TurnEndPhase");
-      expect(enemy.hp).toBeLessThan(9999);
-      const firstHp = enemy.hp;
+      await game.phaseInterceptor.to("MoveEndPhase");
+      expect(enemy.hp).toBe(9999);
       const weather = FORGE_WEATHERS.some(entry => entry.name === definition.name);
       expect(weather ? game.scene.arena.weatherType : game.scene.arena.terrainType).toBe(definition.type);
-      expect(weather ? game.scene.arena.weather?.turnsLeft : game.scene.arena.terrain?.turnsLeft).toBe(4);
-      await game.phaseInterceptor.to("CommandPhase");
-      game.move.select(move.id);
-      await game.phaseInterceptor.to("TurnEndPhase");
-      expect(enemy.hp).toBeLessThan(firstHp);
+      expect(weather ? game.scene.arena.weather?.turnsLeft : game.scene.arena.terrain?.turnsLeft).toBe(5);
     },
   );
 

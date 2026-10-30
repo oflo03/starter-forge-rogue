@@ -79,8 +79,10 @@ describe("Forge original engine registry", () => {
           const move = allMoves[choice.id];
           expect(move.type).toBe(type);
           expect(move.name).toBe(choice.name);
-          expect(move.is("AttackMove")).toBe(true);
-          expect((move as unknown as { forgeAnimation: MoveId }).forgeAnimation).toBe(MoveId.TACKLE);
+          expect(move.is(move.category === MoveCategory.STATUS ? "StatusMove" : "AttackMove")).toBe(true);
+          expect([MoveId.TACKLE, MoveId.RAIN_DANCE, MoveId.MISTY_TERRAIN]).toContain(
+            (move as unknown as { forgeAnimation: MoveId }).forgeAnimation,
+          );
         }
         const abilities = customAbilityChoices([type], stats, "reward-fixture");
         expect(abilities).toHaveLength(3);
