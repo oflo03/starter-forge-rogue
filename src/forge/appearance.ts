@@ -73,16 +73,17 @@ export function forgeTypeChoice(type: PokemonType): string {
 }
 
 /** Battle sprites rest on the ground; summary and naming textures stay centered. */
-export function forgeGroundOffset(key: string): number {
+export function forgeGroundAlignment(key: string): { spriteY: number; shadowY: number } {
   const canvas = globalScene.textures.get(key).getSourceImage() as HTMLCanvasElement;
   const pixels = canvas.getContext("2d")!.getImageData(0, 0, 96, 96).data;
   for (let y = 95; y >= 0; y--) {
     for (let x = 0; x < 96; x++) {
       if (pixels[(y * 96 + x) * 4 + 3]) {
-        // Native player container is at y148, while its visible platform is at y132.
-        return 95 - y - (key.includes("-back-") ? 16 : 0);
+        // Keep both the visible feet and native shadow on the player platform at y132.
+        const shadowY = key.includes("-back-") ? -16 : 0;
+        return { spriteY: 95 - y + shadowY, shadowY };
       }
     }
   }
-  return 0;
+  return { spriteY: 0, shadowY: 0 };
 }

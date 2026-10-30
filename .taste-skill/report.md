@@ -62,3 +62,6 @@ User requested original learn UI and original evolution wording. Keep augment se
 
 ## Latest override: fixed move rewards, review-only type grouping
 Removed level-dependent variants from new drafts: every11/31/51 reward uses the same canonical IDs per family/grade (regular stage0, environment stage2). Grade scaling and type variants unchanged. Old numeric move registrations remain save-compatible and are excluded from new draws; learned-family exclusion recognizes them. Public catalog is222families/666grade variants. MOVE_ARCHETYPES.md groups type variants into31physical/special archetypes for review only; no runtime merging. Native learning/evolution UI unchanged.
+
+## Latest fix: Forge feet and shadow share the ground anchor
+Reproduced on actual production canvas: back sprite feet were normalized to platform y132(-16fromnativecontainer) while native shader yShadowOffset remained0. This left the shadow16px below the visible foot anchor. Kept existing body positioning and applied the same ground delta to the native shadow, including tint sprite; front sprites retain0. Transparent padding still normalizes per asset. Unit tests cover varying padding/front/back/empty textures. No sprite artwork, native species positioning or summary/naming layout changed. User subsequently authorized deployment of all current changes.

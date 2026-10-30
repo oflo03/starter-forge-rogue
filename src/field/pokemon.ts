@@ -5,7 +5,7 @@ import { generateMoveset } from "#ai/ai-moveset-gen";
 import type { Battle } from "#app/battle";
 import type { BattleScene } from "#app/battle-scene";
 import { PLAYER_PARTY_MAX_SIZE, RARE_CANDY_FRIENDSHIP_CAP } from "#app/constants";
-import { forgeAppearance, forgeGroundOffset } from "#app/forge/appearance";
+import { forgeAppearance, forgeGroundAlignment } from "#app/forge/appearance";
 import { forgeBodyForSeed } from "#app/forge/body";
 import { audioManager } from "#app/global-audio-manager";
 import { timedEventManager } from "#app/global-event-manager";
@@ -1291,9 +1291,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   playAnim(): void {
     this.playSprite(this.getSprite(), this.getTintSprite(), this.getBattleSpriteKey());
     if (this.customPokemonData.forge) {
-      const y = forgeGroundOffset(this.getBattleSpriteKey());
-      this.getSprite().setY(y);
-      this.getTintSprite()?.setY(y);
+      const { spriteY, shadowY } = forgeGroundAlignment(this.getBattleSpriteKey());
+      for (const sprite of [this.getSprite(), this.getTintSprite()]) {
+        sprite?.setY(spriteY).setPipelineData("yShadowOffset", shadowY);
+      }
     }
   }
 
