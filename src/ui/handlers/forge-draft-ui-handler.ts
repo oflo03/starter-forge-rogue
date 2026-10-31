@@ -61,11 +61,13 @@ export class ForgeDraftUiHandler extends UiHandler {
     super.show(args);
     this.config = config;
     this.accepted = false;
-    this.inputGate.open(
-      performance.now(),
-      [Button.ACTION, Button.SUBMIT].filter(button => globalScene.inputController?.isButtonPressed?.(button)),
-      globalScene.input.activePointer?.isDown ?? false,
-    );
+    if (rerolledIndex === undefined) {
+      this.inputGate.open(
+        performance.now(),
+        [Button.ACTION, Button.SUBMIT].filter(button => globalScene.inputController?.isButtonPressed?.(button)),
+        globalScene.input.activePointer?.isDown ?? false,
+      );
+    }
     this.root.removeAll(true).setVisible(true);
     this.getUi().moveTo(this.root, this.getUi().length - 1);
     this.borders = [];
@@ -79,12 +81,13 @@ export class ForgeDraftUiHandler extends UiHandler {
     const reducedMotion = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
     if (!reducedMotion && rerolledIndex === undefined) {
       title.setAlpha(0);
-      this.animate({ targets: title, alpha: 1, duration: 250 });
+      this.animate({ targets: title, alpha: 1, duration: 180 });
     }
     const gap = 6;
     const count = config.options.length;
     const cardWidth = Math.floor((width - 16 - gap * (count - 1)) / count);
     const cardHeight = height - 51;
+    const choiceHeight = cardHeight - (config.onReroll ? 26 : 0);
     const color =
       config.tier === ModifierTier.ULTRA ? 0x88e7f3 : config.tier === ModifierTier.GREAT ? 0xe2b75b : 0xaeb8c9;
     if (config.onReroll) {
@@ -99,7 +102,7 @@ export class ForgeDraftUiHandler extends UiHandler {
       const card = globalScene.add.container(x, 27);
       this.cards.push(card);
       const border = globalScene.add
-        .rectangle(0, 0, cardWidth, cardHeight, 0x202c40)
+        .rectangle(0, 0, cardWidth, choiceHeight, 0x202c40)
         .setOrigin(0)
         .setStrokeStyle(1, color);
       card.add(border);
@@ -165,7 +168,10 @@ export class ForgeDraftUiHandler extends UiHandler {
           this.choose();
         });
       this.root.add(card);
-      if (!reducedMotion && (rerolledIndex === undefined || rerolledIndex === index)) {
+      if (!reducedMotion && rerolledIndex === index) {
+        card.setAlpha(0.65);
+        this.animate({ targets: card, alpha: 1, duration: 120 });
+      } else if (!reducedMotion && rerolledIndex === undefined) {
         card
           .setPosition(x + cardWidth * 0.02, 51)
           .setScale(0.96)
@@ -177,8 +183,8 @@ export class ForgeDraftUiHandler extends UiHandler {
           scaleX: 1,
           scaleY: 1,
           alpha: 1,
-          delay: 80 + index * 100,
-          duration: 480,
+          delay: index * 40,
+          duration: 220,
           ease: "Back.easeOut",
         });
         const glint = globalScene.add
@@ -186,7 +192,7 @@ export class ForgeDraftUiHandler extends UiHandler {
           .setOrigin(0)
           .setAlpha(0);
         card.add(glint);
-        this.animate({ targets: glint, alpha: 0.9, delay: 440 + index * 100, duration: 170, yoyo: true });
+        this.animate({ targets: glint, alpha: 0.9, delay: 180 + index * 40, duration: 110, yoyo: true });
       }
     });
     if (config.onParty) {
@@ -209,13 +215,22 @@ export class ForgeDraftUiHandler extends UiHandler {
   override setCursor(cursor: number): boolean {
     const changed = super.setCursor(cursor);
     const count = this.config?.options.length ?? 0;
-    const focus = cursor < count ? cursor : this.config?.onReroll && cursor < count * 2 ? cursor - count : -1;
+    const focus = cursor < count ? cursor : -1;
     this.borders.forEach((border, index) =>
-      border.setStrokeStyle(index === focus ? 2 : 1, index === focus ? 0xf4d68b : 0x52647d),
+      border
+        .setStrokeStyle(index === focus ? 2 : 1, index === focus ? 0xf4d68b : 0x52647d)
+        .setFillStyle(index === focus ? 0x2c3850 : 0x202c40),
     );
-    this.rerollButtons.forEach((button, index) =>
-      button.background.setFillStyle(cursor === count + index ? 0x34435c : 0x152031),
-    );
+    this.rerollButtons.forEach((button, index) => {
+      const focused = cursor === count + index;
+      const left = this.config?.rerollsRemaining?.[index] ?? 0;
+      button.background
+        .setFillStyle(focused && left ? 0xeaf2ff : 0x152031)
+        .setStrokeStyle(focused ? 2 : 1, focused && left ? 0xffffff : 0x52647d);
+      button.label
+        .setText(`${focused ? "▶ " : ""}새로고침 ${left}`)
+        .setColor(focused && left ? "#101827" : left ? "#dce5ee" : "#718093");
+    });
     this.partyText?.setColor(cursor === count * (this.config?.onReroll ? 2 : 1) ? "#f4d68b" : "#bdc8d8");
     return changed;
   }

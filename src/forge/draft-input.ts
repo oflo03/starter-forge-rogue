@@ -1,17 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-export const DRAFT_INPUT_DELAY = 1200;
-export const DRAFT_INPUT_QUIET = 350;
+export const DRAFT_INPUT_DELAY = 350;
 
 /** Wall-clock guard: game speed must not shorten the time to read a reward. */
 export class DraftInputGate {
   private readyAt = 0;
-  private lastAttempt = 0;
   private held = new Set<number>();
   private pointerHeld = false;
 
   open(now: number, held: number[] = [], pointerHeld = false): void {
     this.readyAt = now + DRAFT_INPUT_DELAY;
-    this.lastAttempt = now;
     this.held = new Set(held);
     this.pointerHeld = pointerHeld;
   }
@@ -29,8 +26,6 @@ export class DraftInputGate {
   }
 
   confirm(now: number): boolean {
-    const quiet = now - this.lastAttempt >= DRAFT_INPUT_QUIET;
-    this.lastAttempt = now;
-    return this.isReady(now) && quiet && this.held.size === 0 && !this.pointerHeld;
+    return this.isReady(now) && this.held.size === 0 && !this.pointerHeld;
   }
 }
